@@ -1,0 +1,87 @@
+;
+; rwdrv.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=Sample ; TODO: edit Class
+ClassGuid={78A1C341-4539-11d3-B88D-00C04FAD5171} ; TODO: edit ClassGuid
+Provider=%ManufacturerName%
+CatalogFile=rwdrv.cat
+DriverVer= 0.1; TODO: set DriverVer in stampinf property pages
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+rwdrv_Device_CoInstaller_CopyFiles = 11
+
+; ================= Class section =====================
+
+[ClassInstall32]
+Addreg=SampleClassReg
+
+[SampleClassReg]
+HKR,,,0,%ClassName%
+HKR,,Icon,,-5
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+rwdrv.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%rwdrv.DeviceDesc%=rwdrv_Device, Root\rwdrv ; TODO: edit hw-id
+
+[rwdrv_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+rwdrv.sys
+
+;-------------- Service installation
+[rwdrv_Device.NT.Services]
+AddService = rwdrv,%SPSVCINST_ASSOCSERVICE%, rwdrv_Service_Inst
+
+; -------------- rwdrv driver install sections
+[rwdrv_Service_Inst]
+DisplayName    = %rwdrv.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\rwdrv.sys
+
+;
+;--- rwdrv_Device Coinstaller installation ------
+;
+
+[rwdrv_Device.NT.CoInstallers]
+AddReg=rwdrv_Device_CoInstaller_AddReg
+CopyFiles=rwdrv_Device_CoInstaller_CopyFiles
+
+[rwdrv_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[rwdrv_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[rwdrv_Device.NT.Wdf]
+KmdfService =  rwdrv, rwdrv_wdfsect
+[rwdrv_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+ClassName="Samples" ; TODO: edit ClassName
+DiskName = "rwdrv Installation Disk"
+rwdrv.DeviceDesc = "rwdrv Device"
+rwdrv.SVCDESC = "rwdrv Service"
