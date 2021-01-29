@@ -1,0 +1,2 @@
+cd /d "C:\Users\yakuri354\source\repos\rwdrv\kdmapper" &msbuild "kdmapper.vcxproj" /t:sdvViewer /p:configuration="Release" /p:platform="x64" /p:SolutionDir="C:\Users\yakuri354\source\repos\rwdrv" 
+exit %errorlevel% 

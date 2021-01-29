@@ -3,9 +3,46 @@
 
 #include <iostream>
 #include <Windows.h>
+#include "../kdmapper/kdmapper.hpp"
+#include "xorstr.hpp"
+
+#define BUF_SIZE (1024 * 10)
+
+struct SHARED_MEM
+{
+	HANDLE hFile;
+	PVOID buf;
+};
+
+std::string GenRandStr(const int len)
+{
+	std::string tmp_s;
+	static const char alphanum[] =
+		"0123456789"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		"abcdefghijklmnopqrstuvwxyz";
+
+	srand(static_cast<unsigned>(time(nullptr)) * _getpid());
+
+	tmp_s.reserve(len);
+
+	for (auto i = 0; i < len; ++i)
+		tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
+
+
+	return tmp_s;
+}
+
+auto ExePath() -> std::string
+{
+	CHAR buffer[MAX_PATH] = {0};
+	GetModuleFileNameA(NULL, buffer, MAX_PATH);
+	std::string::size_type pos = std::string(buffer).find_last_of(xorstr_("\\/"));
+	return std::string(buffer).substr(0, pos);
+}
 
 //Returns the last Win32 error, in string format. Returns an empty string if there is no error.
-std::string GetLastErrorAsString()
+auto GetLastErrorAsString() -> std::string
 {
 	//Get the error message ID, if any.
 	DWORD errorMessageID = ::GetLastError();
@@ -32,47 +69,130 @@ std::string GetLastErrorAsString()
 	return message;
 }
 
+bool OpenSharedMemory(SHARED_MEM* mem)
+{
+	auto hFile = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, xorstr_("Global\\SharedMem"));
+	if (!hFile || hFile == INVALID_HANDLE_VALUE)
+	{
+		std::cout << xorstr_("[-] OpenFileMappingA(write) failed; Error:") << GetLastError() << std::endl;
+		return false;
+	}
+
+	auto buf = MapViewOfFile(hFile, // handle to map object
+		FILE_MAP_ALL_ACCESS,  // read/write permission
+		0,
+		0,
+		BUF_SIZE);
+
+	if (buf == nullptr)
+	{
+		_tprintf(TEXT("[-] Could not map view of file (%d).\n"),
+			GetLastError());
+
+		CloseHandle(hFile);
+
+		return false;
+	}
+
+	mem->buf = buf;
+	mem->hFile = hFile;
+	
+	printf("[-] Shared memory successfully initialized\n");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0xA);
+	return true;
+}
+
+
 int main()
 {
+	std::cout << "[>] Loading rwdrv" << std::endl;
 	auto sc_handle = OpenSCManagerA(nullptr,
-	                              nullptr, SC_MANAGER_ENUMERATE_SERVICE);
+	                                nullptr, SC_MANAGER_ENUMERATE_SERVICE);
 	if (!sc_handle)
 	{
-		std::cout << "Error occured while loading service manager: " << GetLastErrorAsString() << std::endl;
+		std::cout << xorstr_("[-] Error occured while loading service manager: ") << GetLastErrorAsString() << std::endl;
 		return 1;
 	}
 
-	auto be_svc = OpenServiceA(sc_handle, "BEService", GENERIC_READ);
+	// DWORD servicesBufSize;
+	// DWORD servicesCount;
+	// DWORD resumeHandle;
+	//
+	// std::cout << xorstr_("[>] Checking for BattlEye service") << std::endl;
+	//
+	// EnumServicesStatusA(
+	// 	sc_handle,
+	// 	SERVICE_WIN32,
+	// 	SERVICE_ACTIVE,
+	// 	NULL,
+	// 	0,
+	// 	&servicesBufSize,
+	// 	&servicesCount,
+	// 	&resumeHandle
+	// );
+	//
+	// auto svcBuf = new BYTE[servicesBufSize];
+	// if (!EnumServicesStatusA(
+	// 	sc_handle,
+	// 	SERVICE_WIN32,
+	// 	SERVICE_ACTIVE,
+	// 	LPENUM_SERVICE_STATUSA(svcBuf),
+	// 	servicesBufSize,
+	// 	&servicesBufSize,
+	// 	&servicesCount,
+	// 	&resumeHandle
+	// ))
+	// {
+	// 	std::cout << xorstr_("[-] Failed to enumerate all services: ") << GetLastErrorAsString() << std::endl;
+	// 	return 1;
+	// }
+	//
+	// for (DWORD i = 0; i < servicesCount; i++)
+	// {
+	// 	if (strcmp(LPENUM_SERVICE_STATUSA(svcBuf)[i].lpServiceName, "BEService") == 0)
+	// 	{
+	// 		std::cout << xorstr_("[-] BEService is running, close the game before loading the cheat.") << std::endl;
+	// 		return 1;
+	// 	}
+	// }
 
-	if (!be_svc)
+	if (intel_driver::IsRunning())
 	{
-		std::cout << "Error while opening BE service: " << GetLastErrorAsString() << std::endl;
+		std::cout << xorstr_("[-] \\Device\\Nal already exists, unload iqwv64e.sys to proceed");
 		return 1;
 	}
 
-	DWORD buf_size;
+	const auto intel_drv_handle = intel_driver::Load();
 
-	if (!QueryServiceStatusEx(be_svc, SC_STATUS_PROCESS_INFO, nullptr, 0, &buf_size))
+	if (!intel_drv_handle || intel_drv_handle == INVALID_HANDLE_VALUE)
 	{
-		std::cout << "Error while determining process status structure buffer size: " << GetLastErrorAsString() << std::endl;
+		std::cout << xorstr_("[-] Failed to load vulnerable intel driver\n");
 		return 1;
 	}
 
-	auto buf = new BYTE[buf_size];
+	std::cout << xorstr_("[>] Mapping driver and calling DriverEntry") << std::endl;
 
-	if (!QueryServiceStatusEx(be_svc, SC_STATUS_PROCESS_INFO, buf, buf_size, &buf_size))
+	if (!kdmapper::MapDriver(intel_drv_handle, (ExePath() + xorstr_("\\rwdrv.sys"))))
 	{
-		std::cout << "Error while retrieving BattlEye service status: " << GetLastErrorAsString() << std::endl;
+		std::cout << xorstr_("[-] Failed to map rwdrv") << std::endl;
+		intel_driver::Unload(intel_drv_handle);
 		return 1;
 	}
 
-	auto state = reinterpret_cast<LPSERVICE_STATUS_PROCESS>(buf)->dwCurrentState;
+	std::cout << xorstr_("[>] Unloading vulnerable driver");
+	intel_driver::Unload(intel_drv_handle);
 
-	if (state != SERVICE_STOPPED)
+	SHARED_MEM mem = {};
+
+	std::cout << xorstr_("[>] Opening shared memory") << std::endl;
+	if (!OpenSharedMemory(&mem) || mem.buf == nullptr)
 	{
-		std::cout << "BattlEye service is running! Close the game before loading the driver" << std::endl;
-		return 2;
+		std::cout << xorstr_("[-] Failed to open shared memory") << std::endl;
+		return 1;
 	}
 
-	delete[] buf;
+	std::cout << xorstr_("[>] Signaling cleanup stage start") << std::endl;
+	*PULONGLONG(mem.buf) = ULONGLONG(0xDEADBEEF);
+	
+	return 0;
 }
