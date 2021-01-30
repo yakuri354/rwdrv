@@ -2,239 +2,95 @@
 #include <ntifs.h>
 #include <ntddk.h>
 #include <ntstrsafe.h>
+
+#include "../../../../../../Program Files (x86)/Windows Kits/10/Include/10.0.19041.0/um/apiquery2.h"
 #include "clean.hpp"
 #include "skcrypt.h"
 
-struct SharedMem
-{
-	PVOID SharedSection;
-	HANDLE SectionHandle;
-	SECURITY_DESCRIPTOR SecDescriptor;
-};
+typedef INT64 (*HookedFnPtr)(UINT, UINT, UINT);
 
 struct DriverState
 {
-	SharedMem Mem;
+	bool Initialized;
 	PVOID BaseAddress;
 };
 
-DriverState g_DriverState;
+DriverState g_driverState;
 
 inline NTSTATUS BoolToNt(const bool b)
 {
 	return b ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
-NTSTATUS CleanupLoadingTraces(DriverState* driverState)
+NTSTATUS SetupHook()
 {
-	log(skCrypt("[rwdrv] Cleaning traces\n"));
-
-	UNICODE_STRING driverName;
-
-	RtlInitUnicodeString(&driverName, skCrypt(L"iqvw64e.dll"));
-
-	const auto result =
-		clear::ClearMmUnloadedDrivers(&driverName, true) == STATUS_SUCCESS
-		&& clear::ClearPiDDBCacheTable(driverName, NULL) == STATUS_SUCCESS
-		&& clear::ClearSystemBigPoolInfo(driverState->BaseAddress) == STATUS_SUCCESS;
-	//&& clear::ClearPfnDatabase() == STATUS_SUCCESS;
-
-	RtlFreeUnicodeString(&driverName);
-	return BoolToNt(result);
-}
-
-NTSTATUS CreateSharedMemory(SharedMem& mem)
-{
-	PVOID sharedSection = nullptr;
-	HANDLE sectionHandle;
-	SECURITY_DESCRIPTOR secDescriptor{};
-
-	extern NTKERNELAPI ERESOURCE PsLoadedModuleResource;
-
-	log(skCrypt("[rwdrv] Creating shared memory\n"));
-
-	auto status = RtlCreateSecurityDescriptor(&secDescriptor, SECURITY_DESCRIPTOR_REVISION);
-	if (!NT_SUCCESS(status))
+	DbgBreakPoint();
+	// ApiSetEditionOpenInputDesktopEntryPoint(uint, uint, uint);	
+	const auto qwordPtr = Search::FindPattern(
+		UINT64(Search::Win32kBase),
+		Search::Win32kSize,
+		reinterpret_cast<BYTE*>("\x8B\xCD\xFF\x15\x00\x00\x00\x00\x48\x8B\xD8"),
+		skCrypt("xxxx????xxx")
+	);
+	
+	if (qwordPtr == NULL)
 	{
-		log(skCrypt("[rwdrv] RtlCreateSecurityDescriptor failed: %lX\n"), status);
-		return status;
+		log(skCrypt("[rwdrv] Failed to locate qword_ptr\n"));
+		return STATUS_UNSUCCESSFUL;
 	}
 
-	log(skCrypt("[rwdrv] Security descriptor created: 0x%p\n"), &secDescriptor);
+	log(skCrypt("[rwdrv] Found qword_ptr call at [0x%p]\n"), PVOID(qwordPtr));
 
-	const ULONG daclLength = sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE) * 3 + RtlLengthSid(SeExports->SeLocalSystemSid) +
-		RtlLengthSid(SeExports->SeAliasAdminsSid) +
-		RtlLengthSid(SeExports->SeWorldSid);
 
-	const auto acl = static_cast<PACL>(ExAllocatePoolWithTag(PagedPool, daclLength, 'lcaD'));
+	auto qwordPtrDeref = UINT64(qwordPtr) - 0xA;
+	qwordPtrDeref = UINT64(qwordPtrDeref) + *PINT(PBYTE(qwordPtrDeref) + 3) + 7;
 
-	if (acl == nullptr)
-	{
-		log(skCrypt("[rwdrv] ExAllocatePoolWithTag failed: %lX\n"), status);
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
+	log(skCrypt("[rwdrv] Function pointer location at [0x%p]\n"), PVOID(qwordPtrDeref));
 
-	status = RtlCreateAcl(acl, daclLength, ACL_REVISION);
-
-	if (!NT_SUCCESS(status))
-	{
-		ExFreePool(acl);
-		log(skCrypt("[rwdrv] RtlCreateAcl failed: %lX\n"), status);
-		return status;
-	}
-
-	status = RtlAddAccessAllowedAce(acl, ACL_REVISION, FILE_ALL_ACCESS, SeExports->SeWorldSid);
-
-	if (!NT_SUCCESS(status))
-	{
-		ExFreePool(acl);
-		log(skCrypt("[rwdrv] RtlAddAccessAllowedAce SeWorldSid failed: %lX\n"), status);
-		return status;
-	}
-
-	status = RtlAddAccessAllowedAce(acl,
-	                                ACL_REVISION,
-	                                FILE_ALL_ACCESS,
-	                                SeExports->SeAliasAdminsSid);
-
-	if (!NT_SUCCESS(status))
-	{
-		ExFreePool(acl);
-		log(skCrypt("[rwdrv] RtlAddAccessAllowedAce SeAliasAdminsSid failed: %lX\n"), status);
-		return status;
-	}
-
-	status = RtlAddAccessAllowedAce(acl,
-	                                ACL_REVISION,
-	                                FILE_ALL_ACCESS,
-	                                SeExports->SeLocalSystemSid);
-
-	if (!NT_SUCCESS(status))
-	{
-		ExFreePool(acl);
-		log(skCrypt("[rwdrv] RtlAddAccessAllowedAce SeLocalSystemSid failed: %lX\n"), status);
-		return status;
-	}
-
-	status = RtlSetDaclSecurityDescriptor(&secDescriptor,
-	                                      TRUE,
-	                                      acl,
-	                                      FALSE);
-
-	if (!NT_SUCCESS(status))
-	{
-		ExFreePool(acl);
-		log(skCrypt("[rwdrv] RtlSetDaclSecurityDescriptor failed: %lX\n"), status);
-		return status;
-	}
-
-	OBJECT_ATTRIBUTES objAttr{};
-	UNICODE_STRING sectionName;
-	RtlInitUnicodeString(&sectionName, skCrypt(L"\\BaseNamedObjects\\SysSharedMem"));
-	InitializeObjectAttributes(&objAttr, &sectionName, OBJ_CASE_INSENSITIVE, NULL, &secDescriptor);
-
-	log(skCrypt("[rwdrv] Object created with name %wZ\n"), &sectionName);
-
-	LARGE_INTEGER lMaxSize = {};
-	lMaxSize.HighPart = 0;
-	lMaxSize.LowPart = 1024 * 10;
-	status = ZwCreateSection(&sectionHandle, SECTION_ALL_ACCESS, &objAttr, &lMaxSize, PAGE_READWRITE, SEC_COMMIT, NULL);
-	// Create section with section handle, object attributes, and the size of shared mem struct
-	if (!NT_SUCCESS(status))
-	{
-		log(skCrypt("[rwdrv] ZwCreateSection failed: %lX\n"), status);
-		return status;
-	}
-
-	SIZE_T ulViewSize = 1024 * 10; // &sectionHandle before was here i guess i am correct 
-	status = ZwMapViewOfSection(sectionHandle,
-	                            ZwCurrentProcess(),
-	                            &sharedSection,
-	                            0,
-	                            ulViewSize,
-	                            nullptr,
-	                            &ulViewSize,
-	                            ViewShare,
-	                            0,
-	                            PAGE_READWRITE | PAGE_NOCACHE);
-	if (!NT_SUCCESS(status))
-	{
-		log(skCrypt("[rwdrv] ZwMapViewOfSection failed; Status: %lX\n"), status);
-		ZwClose(sectionHandle);
-		return status;
-	}
-
-	log(skCrypt("[rwdrv] Successfully created shared memory section, mapped buffer address [0x%p] \n"), sharedSection);
-
-	ExFreePool(acl);
-	// moved this from line : 274 to here 313 its maybe why its causing the error (would be better if i put this in unload driver)
-
-	mem.SectionHandle = sectionHandle;
-	mem.SecDescriptor = secDescriptor;
-	mem.SharedSection = sharedSection;
+	DbgBreakPoint();
 
 	return STATUS_SUCCESS;
 }
 
-KSTART_ROUTINE KstartRoutine;
-
-void KstartRoutine(
-	void* threadState
-)
+INT64 __fastcall HookControl(UINT a1, UINT a2, UINT a3)
 {
-	const auto pDriverState = static_cast<DriverState*>(threadState);
-	log(skCrypt("[rwdrv] Thread created, waiting for synchronization\n"));
-	LARGE_INTEGER waitInterval;
-	waitInterval.QuadPart = 5;
-	while (true)
-	{
-		log("[rwdrv] about to read from [0x%p]\n", pDriverState->Mem.SharedSection);
-		DbgBreakPoint();
-		KeDelayExecutionThread(KernelMode, false, &waitInterval);
-		if (*PULONGLONG(pDriverState->Mem.SharedSection) == ULONGLONG(0xDEADBEEF))
-		{
-			log(skCrypt("[rwdrv] Thread starting signal received\n"));
-			DbgBreakPoint();
-			CleanupLoadingTraces(pDriverState);
-			log("[rwdrv] Finish!\n");
-		}
-	}
+	log(skCrypt("[rwdrv] Hook called!, args [%ud] [%ud] [%ud]\n"), a1, a2, a3);
+	
+	return 0;
 }
 
-NTSTATUS InitSystemThread(DriverState* driverState)
+NTSTATUS InitRoutine(PVOID baseAddr)
 {
-	log(skCrypt("[rwdrv] Creating system thread\n"));
-	HANDLE hThread;
-	if (PsCreateSystemThread(
-		&hThread,
-		THREAD_ALL_ACCESS,
-		nullptr,
-		nullptr,
-		nullptr,
-		&KstartRoutine,
-		static_cast<PVOID>(driverState)
-	) != STATUS_SUCCESS)
+	g_driverState.BaseAddress = baseAddr;
+
+	const auto status = Search::SetKernelProps();
+	if (!NT_SUCCESS(status))
 	{
-		log(skCrypt("[rwdrv] Failed to create system thread\n"));
+		log(skCrypt("[rwdrv] Failed to obtain kernel modules\n"));
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	log(skCrypt("[rwdrv] Clearing thread creation traces\n"));
-
-	return BoolToNt(
-		clear::UnlinkThread(hThread) == STATUS_SUCCESS
-		&& clear::ClearPsPcIdTable(hThread) == STATUS_SUCCESS
-	);
+	return status;
 }
 
-NTSTATUS
-DriverEntry(PVOID baseAddress)
+NTSTATUS DriverEntry(PVOID baseAddress)
 {
-	g_DriverState.BaseAddress = baseAddress;
-
 	log(skCrypt("[rwdrv] Driver loaded at [0x%p]\n"), baseAddress);
-	return BoolToNt(
-		CreateSharedMemory(g_DriverState.Mem) == STATUS_SUCCESS
-		&& InitSystemThread(&g_DriverState) == STATUS_SUCCESS
-	);
+	DbgBreakPoint();
+
+	auto status = InitRoutine(baseAddress);
+	if (!NT_SUCCESS(status))
+	{
+		log(skCrypt("[rwdrv] Driver initialization routine failed.\n"));
+		return status;
+	}
+
+	status = SetupHook();
+	if (!NT_SUCCESS(status))
+	{
+		log(skCrypt("[rwdrv] Failed to setup communication hook\n"));
+		return status;
+	}
+
+	return status;
 }

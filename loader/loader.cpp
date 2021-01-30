@@ -69,39 +69,6 @@ auto GetLastErrorAsString() -> std::string
 	return message;
 }
 
-bool OpenSharedMemory(SHARED_MEM* mem)
-{
-	auto hFile = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, xorstr_("Global\\SharedMem"));
-	if (!hFile || hFile == INVALID_HANDLE_VALUE)
-	{
-		std::cout << xorstr_("[-] OpenFileMappingA(write) failed; Error:") << GetLastError() << std::endl;
-		return false;
-	}
-
-	auto buf = MapViewOfFile(hFile, // handle to map object
-		FILE_MAP_ALL_ACCESS,  // read/write permission
-		0,
-		0,
-		BUF_SIZE);
-
-	if (buf == nullptr)
-	{
-		_tprintf(TEXT("[-] Could not map view of file (%d).\n"),
-			GetLastError());
-
-		CloseHandle(hFile);
-
-		return false;
-	}
-
-	mem->buf = buf;
-	mem->hFile = hFile;
-	
-	printf("[-] Shared memory successfully initialized\n");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0xA);
-	return true;
-}
-
 
 int main()
 {
@@ -178,21 +145,9 @@ int main()
 		intel_driver::Unload(intel_drv_handle);
 		return 1;
 	}
-
-	std::cout << xorstr_("[>] Unloading vulnerable driver");
+	
 	intel_driver::Unload(intel_drv_handle);
 
-	SHARED_MEM mem = {};
-
-	std::cout << xorstr_("[>] Opening shared memory") << std::endl;
-	if (!OpenSharedMemory(&mem) || mem.buf == nullptr)
-	{
-		std::cout << xorstr_("[-] Failed to open shared memory") << std::endl;
-		return 1;
-	}
-
-	std::cout << xorstr_("[>] Signaling cleanup stage start") << std::endl;
-	*PULONGLONG(mem.buf) = ULONGLONG(0xDEADBEEF);
 	
 	return 0;
 }
