@@ -45,45 +45,47 @@ NTSTATUS Search::SetKernelProps()
 
 	log(skCrypt("[rwdrv] Searching trough %d modules\n"), pMods->NumberOfModules);
 
+	auto kf = false, wf = false;
+
 	if (NT_SUCCESS(status))
 	{
 		const auto pMod = pMods->Modules;
 
 		for (ULONG i = 0; i < pMods->NumberOfModules; i++)
 		{
-			log(skCrypt("[rwdrv] module %s\n"), pMod[i].FullPathName);
-			// if (!kf) {
-			//
-			// 	// System routine is inside module
-			// 	if (checkPtr >= pMod[i].ImageBase &&
-			// 		checkPtr < PVOID(PUCHAR(pMod[i].ImageBase) + pMod[i].ImageSize))
-			// 	{
-			// 		KernelBase = pMod[i].ImageBase;
-			// 		KernelSize = pMod[i].ImageSize;
-			// 		kf = true;
-			// 		continue;
-			// 	}
-			// }
-			// if (!wf)
-			// {
-			// 	if (strcmp(reinterpret_cast<const char*>(pMod[i].FullPathName),
-			// 		skCrypt("\\SystemRoot\\System32\\win32kbase.sys")) == 0)
-			// 	{
-			// 		Win32kBase = pMod[i].ImageBase;
-			// 		Win32kSize = pMod[i].ImageSize;
-			// 		wf = true;
-			// 		continue;
-			// 	}
-			// }
-			// if (kf && wf)
-			// {
-			// 	break;
-			// }
+			if (!kf) {
+			
+				// System routine is inside module
+				if (checkPtr >= pMod[i].ImageBase &&
+					checkPtr < PVOID(PUCHAR(pMod[i].ImageBase) + pMod[i].ImageSize))
+				{
+					KernelBase = pMod[i].ImageBase;
+					KernelSize = pMod[i].ImageSize;
+					kf = true;
+					continue;
+				}
+			}
+			if (!wf)
+			{
+				if (strcmp(reinterpret_cast<const char*>(pMod[i].FullPathName),
+					skCrypt("\\SystemRoot\\System32\\win32kbase.sys")) == 0)
+				{
+					Win32kBase = pMod[i].ImageBase;
+					Win32kSize = pMod[i].ImageSize;
+					wf = true;
+					continue;
+				}
+			}
+			if (kf && wf)
+			{
+				break;
+			}
 		}
 	}
 
-	if (pMods)
+	if (pMods) {
 		ExFreePoolWithTag(pMods, BB_POOL_TAG);
+	}
 	log(skCrypt("[rwdrv] KernelBase: [0x%p]\n"), KernelBase);
 	log(skCrypt("[rwdrv] KernelSize: [%d]\n"), KernelSize);
 	log(skCrypt("[rwdrv] Win32kBase: [0x%p]\n"), Win32kBase);

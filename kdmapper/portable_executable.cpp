@@ -1,10 +1,18 @@
 #include "portable_executable.hpp"
-#include "ntdll.h"
 
 PIMAGE_NT_HEADERS64 portable_executable::GetNtHeaders(void* image_base)
 {
-	const PIMAGE_NT_HEADERS64 headers = RtlImageNtHeader(image_base);
-	return headers != nullptr && headers->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? headers : nullptr;
+	const auto dos_header = reinterpret_cast<PIMAGE_DOS_HEADER>(image_base);
+
+	if (dos_header->e_magic != IMAGE_DOS_SIGNATURE)
+		return nullptr;
+
+	const auto nt_headers = reinterpret_cast<PIMAGE_NT_HEADERS64>(reinterpret_cast<uint64_t>(image_base) + dos_header->e_lfanew);
+
+	if (nt_headers->Signature != IMAGE_NT_SIGNATURE)
+		return nullptr;
+
+	return nt_headers;
 }
 
 portable_executable::vec_relocs portable_executable::GetRelocs(void* image_base)
@@ -15,13 +23,17 @@ portable_executable::vec_relocs portable_executable::GetRelocs(void* image_base)
 		return {};
 
 	vec_relocs relocs;
+	DWORD reloc_va = nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress;
 
-	auto current_base_relocation = reinterpret_cast<PIMAGE_BASE_RELOCATION>(reinterpret_cast<uint64_t>(image_base) + nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress);
+	if (!reloc_va) //Fix from @greetmark of UnknownCheats Forum
+		return {};
+
+	auto current_base_relocation = reinterpret_cast<PIMAGE_BASE_RELOCATION>(reinterpret_cast<uint64_t>(image_base) + reloc_va);
 	const auto reloc_end = reinterpret_cast<uint64_t>(current_base_relocation) + nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size;
 
 	while (current_base_relocation->VirtualAddress && current_base_relocation->VirtualAddress < reloc_end && current_base_relocation->SizeOfBlock)
 	{
-		RelocInfo reloc_info{};
+		RelocInfo reloc_info;
 
 		reloc_info.address = reinterpret_cast<uint64_t>(image_base) + current_base_relocation->VirtualAddress;
 		reloc_info.item = reinterpret_cast<uint16_t*>(reinterpret_cast<uint64_t>(current_base_relocation) + sizeof(IMAGE_BASE_RELOCATION));

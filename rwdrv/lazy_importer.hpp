@@ -29,12 +29,9 @@
 // NOTE only std::forward is used from this header.
 // If there is a need to eliminate this dependency the function itself is very small.
 
-#include "../EASTL-3.17.03/include/EASTL/utility.h"
-#include <cstddef>
 #include <intrin.h>
-#include <ntdef.h>
 
-typedef WCHAR wchar_t;
+typedef unsigned short wchat_t;;
 
 #ifndef LAZY_IMPORTER_NO_FORCEINLINE
 #if defined(_MSC_VER)

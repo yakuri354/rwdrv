@@ -1,6 +1,4 @@
 #include "kdmapper.hpp"
-#include "bcrypt.h"
-#pragma comment (lib, "bcrypt.lib")
 
 uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver_path)
 {
@@ -8,33 +6,45 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 
 	if (!utils::ReadFileToMemory(driver_path, &raw_image))
 	{
-		std::cout << xorstr_("[-] Failed to read image to memory") << std::endl;
+		std::cout << "[-] Failed to read image to memory" << std::endl;
 		return 0;
 	}
 
-	const auto nt_headers = portable_executable::GetNtHeaders(raw_image.data());
+	const PIMAGE_NT_HEADERS64 nt_headers = portable_executable::GetNtHeaders(raw_image.data());
 
 	if (!nt_headers)
 	{
-		std::cout << xorstr_("[-] Invalid or non-x64 PE image") << std::endl;
+		std::cout << "[-] Invalid format of PE image" << std::endl;
+		return 0;
+	}
+
+	if (nt_headers->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+	{
+		std::cout << "[-] Image is not 64 bit" << std::endl;
 		return 0;
 	}
 
 	const uint32_t image_size = nt_headers->OptionalHeader.SizeOfImage;
 
-	auto local_image_base = VirtualAlloc(nullptr, image_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-	auto kernel_image_base = intel_driver::AllocatePool(iqvw64e_device_handle, nt::NonPagedPool, image_size);
+	void* local_image_base = VirtualAlloc(nullptr, image_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	if (!local_image_base)
+		return 0;
+
+	DWORD TotalVirtualHeaderSize = (IMAGE_FIRST_SECTION(nt_headers))->VirtualAddress;
+
+	uint64_t kernel_image_base = intel_driver::AllocatePool(iqvw64e_device_handle, nt::POOL_TYPE::NonPagedPool,
+	                                                        image_size - TotalVirtualHeaderSize);
 
 	do
 	{
 		if (!kernel_image_base)
 		{
-			std::cout << xorstr_("[-] Failed to allocate remote image in kernel") << std::endl;
+			std::cout << "[-] Failed to allocate remote image in kernel" << std::endl;
 			break;
 		}
 
-		std::cout << xorstr_("[+] Image base has been allocated at 0x") << reinterpret_cast<void*>(kernel_image_base) <<
-			std::endl;
+		std::cout << "[+] Image base of size " << image_size - TotalVirtualHeaderSize
+			<< " has been allocated at 0x" << reinterpret_cast<void*>(kernel_image_base) << std::endl;
 
 		// Copy image headers
 
@@ -42,104 +52,78 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 
 		// Copy image sections
 
-		const auto section_headers = IMAGE_FIRST_SECTION(nt_headers);
+		const PIMAGE_SECTION_HEADER current_image_section = IMAGE_FIRST_SECTION(nt_headers);
 
 		for (auto i = 0; i < nt_headers->FileHeader.NumberOfSections; ++i)
 		{
-			if ((section_headers[i].Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE)
-				) != 0 &&
-				section_headers[i].PointerToRawData != 0)
-			{
-				const auto local_section = reinterpret_cast<void*>(reinterpret_cast<uint64_t>(local_image_base) +
-					section_headers[i].VirtualAddress);
-				memcpy(local_section,
-				       reinterpret_cast<void*>(reinterpret_cast<uint64_t>(raw_image.data()) + section_headers[i].
-					       PointerToRawData), section_headers[i].SizeOfRawData);
-			}
+			auto local_section = reinterpret_cast<void*>(reinterpret_cast<uint64_t>(local_image_base) +
+				current_image_section[i].VirtualAddress);
+			memcpy(local_section,
+			       reinterpret_cast<void*>(reinterpret_cast<uint64_t>(raw_image.data()) + current_image_section[i].
+				       PointerToRawData), current_image_section[i].SizeOfRawData);
 		}
 
-		// Initialize stack cookie if driver was compiled with /GS
+		uint64_t realBase = kernel_image_base;
+		kernel_image_base -= TotalVirtualHeaderSize;
 
-		InitStackCookie(local_image_base);
+		std::cout << "[+] Skipped 0x" << std::hex << TotalVirtualHeaderSize << " bytes of PE Header" << std::endl;
 
 		// Resolve relocs and imports
 
-		// A missing relocation directory is OK, but disallow IMAGE_FILE_RELOCS_STRIPPED
-		// Not checked: IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE in DllCharacteristics. The DDK/WDK has never set this mostly for historical reasons
-		const auto& relocs = portable_executable::GetRelocs(local_image_base);
-		if (relocs.empty() && (nt_headers->FileHeader.Characteristics & IMAGE_FILE_RELOCS_STRIPPED) != 0)
-		{
-			std::cout << xorstr_("[-] Image is not relocatable") << std::endl;
-			break;
-		}
-
-		RelocateImageByDelta(relocs, kernel_image_base - nt_headers->OptionalHeader.ImageBase);
+		RelocateImageByDelta(portable_executable::GetRelocs(local_image_base),
+		                     kernel_image_base - nt_headers->OptionalHeader.ImageBase);
 
 		if (!ResolveImports(iqvw64e_device_handle, portable_executable::GetImports(local_image_base)))
 		{
-			std::cout << xorstr_("[-] Failed to resolve imports") << std::endl;
+			std::cout << "[-] Failed to resolve imports" << std::endl;
+			kernel_image_base = realBase;
 			break;
 		}
 
 		// Write fixed image to kernel
 
-		if (!intel_driver::WriteMemory(iqvw64e_device_handle, kernel_image_base, local_image_base, image_size))
+		if (!intel_driver::WriteMemory(iqvw64e_device_handle, realBase,
+		                               (PVOID)((uintptr_t)local_image_base + TotalVirtualHeaderSize),
+		                               image_size - TotalVirtualHeaderSize))
 		{
-			std::cout << xorstr_("[-] Failed to write local image to remote image") << std::endl;
+			std::cout << "[-] Failed to write local image to remote image" << std::endl;
+			kernel_image_base = realBase;
 			break;
 		}
-
-		VirtualFree(local_image_base, 0, MEM_RELEASE);
 
 		// Call driver entry point
 
-		const auto address_of_entry_point = kernel_image_base + nt_headers->OptionalHeader.AddressOfEntryPoint;
+		const uint64_t address_of_entry_point = kernel_image_base + nt_headers->OptionalHeader.AddressOfEntryPoint;
 
-		std::cout << xorstr_("[>] Filling driver PE headers with junk") << std::endl;
-
-		auto randBuf = VirtualAlloc(nullptr, nt_headers->OptionalHeader.SizeOfHeaders, MEM_RESERVE | MEM_COMMIT,
-		                            PAGE_READWRITE);
-
-		if (BCryptGenRandom(
-			nullptr,
-			static_cast<PUCHAR>(randBuf),
-			nt_headers->OptionalHeader.SizeOfHeaders,
-			BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0)
-		{
-			std::cout << xorstr_("[-] Failed clearing PE headers: ") << std::endl;
-			break;
-		}
-
-		intel_driver::MemCopy(iqvw64e_device_handle, kernel_image_base, reinterpret_cast<uint64_t>(randBuf),
-		                      nt_headers->OptionalHeader.SizeOfHeaders);
-
-		std::cout << xorstr_("[<] Calling DriverEntry 0x") << reinterpret_cast<void*>(address_of_entry_point) << std::
-			endl;
+		std::cout << "[<] Calling DriverEntry 0x" << reinterpret_cast<void*>(address_of_entry_point) << std::endl;
 
 		NTSTATUS status = 0;
 
 		if (!intel_driver::CallKernelFunction(iqvw64e_device_handle, &status, address_of_entry_point,
-		                                      kernel_image_base))
+		                                      realBase))
 		{
-			std::cout << xorstr_("[-] Failed to call driver entry") << std::endl;
+			std::cout << "[-] Failed to call driver entry" << std::endl;
+			kernel_image_base = realBase;
 			break;
 		}
 
-		std::cout << xorstr_("[+] DriverEntry returned 0x") << std::hex << std::setw(8) << std::setfill('0') << std::
-			uppercase << status << std::nouppercase << std::dec << std::endl;
+		std::cout << "[+] DriverEntry returned 0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase <<
+			status << std::nouppercase << std::dec << std::endl;
 
-		return kernel_image_base;
+		VirtualFree(local_image_base, 0, MEM_RELEASE);
+		return realBase;
 	}
 	while (false);
 
+
 	VirtualFree(local_image_base, 0, MEM_RELEASE);
-	// Entry is removed from BigPoolTable, thus not freed
-	//intel_driver::FreePool(iqvw64e_device_handle, kernel_image_base);
+
+	intel_driver::FreePool(iqvw64e_device_handle, kernel_image_base);
 
 	return 0;
 }
 
-void kdmapper::RelocateImageByDelta(const portable_executable::vec_relocs& relocs, const uint64_t delta)
+void kdmapper::RelocateImageByDelta(portable_executable::vec_relocs relocs, const uint64_t delta)
 {
 	for (const auto& current_reloc : relocs)
 	{
@@ -154,29 +138,26 @@ void kdmapper::RelocateImageByDelta(const portable_executable::vec_relocs& reloc
 	}
 }
 
-bool kdmapper::ResolveImports(HANDLE iqvw64e_device_handle, const portable_executable::vec_imports& imports)
+bool kdmapper::ResolveImports(HANDLE iqvw64e_device_handle, portable_executable::vec_imports imports)
 {
 	for (const auto& current_import : imports)
 	{
-		//std::cout << "Resolving " << current_import.module_name << std::endl;
-
 		if (!utils::GetKernelModuleAddress(current_import.module_name))
 		{
-			std::cout << xorstr_("[-] Dependency ") << current_import.module_name << xorstr_(" wasn't found") << std::
-				endl;
+			std::cout << "[-] Dependency " << current_import.module_name << " wasn't found" << std::endl;
 			return false;
 		}
 
 		for (auto& current_function_data : current_import.function_datas)
 		{
-			const auto function_address = intel_driver::GetKernelModuleExport(
+			const uint64_t function_address = intel_driver::GetKernelModuleExport(
 				iqvw64e_device_handle, utils::GetKernelModuleAddress(current_import.module_name),
 				current_function_data.name);
 
 			if (!function_address)
 			{
-				std::cout << xorstr_("[-] Failed to resolve import ") << current_function_data.name << xorstr_(" (") <<
-					current_import.module_name << xorstr_(")") << std::endl;
+				std::cout << "[-] Failed to resolve import " << current_function_data.name << " (" << current_import.
+					module_name << ")" << std::endl;
 				return false;
 			}
 
@@ -185,43 +166,4 @@ bool kdmapper::ResolveImports(HANDLE iqvw64e_device_handle, const portable_execu
 	}
 
 	return true;
-}
-
-void kdmapper::InitStackCookie(void* base)
-{
-	const auto nt_headers = RtlImageNtHeader(base);
-	ULONG config_dir_size = 0;
-	const auto config_dir = static_cast<PIMAGE_LOAD_CONFIG_DIRECTORY64>(
-		RtlImageDirectoryEntryToData(base,
-		                             TRUE,
-		                             IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG,
-		                             &config_dir_size));
-	if (config_dir == nullptr || config_dir_size == 0)
-		return;
-
-	uint64_t cookie_va;
-	if ((cookie_va = static_cast<uint64_t>(config_dir->SecurityCookie)) == 0)
-		return;
-	cookie_va = cookie_va - nt_headers->OptionalHeader.ImageBase + reinterpret_cast<uint64_t>(base);
-
-	auto cookie = SharedUserData->SystemTime.LowPart ^ cookie_va;
-	cookie &= 0x0000FFFFFFFFFFFFi64;
-
-	constexpr const auto default_security_cookie64 = 0x00002B992DDFA232ULL;
-	if (static_cast<uint64_t>(cookie) == default_security_cookie64)
-		cookie++;
-
-	// Guess the address of the complement (normally correct for MSVC-compiled binaries)
-	auto cookie_complement_va = cookie_va + sizeof(uint64_t);
-	if (*reinterpret_cast<uint64_t*>(cookie_complement_va) != ~default_security_cookie64)
-	{
-		// Nope; try before the cookie instead
-		cookie_complement_va = cookie_va - sizeof(uint64_t);
-		if (*reinterpret_cast<uint64_t*>(cookie_complement_va) != ~default_security_cookie64)
-			cookie_complement_va = 0;
-	}
-
-	*reinterpret_cast<uint64_t*>(cookie_va) = cookie;
-	if (cookie_complement_va != 0)
-		*reinterpret_cast<uint64_t*>(cookie_complement_va) = ~cookie;
 }

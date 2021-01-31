@@ -1,18 +1,11 @@
-// loader.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <iostream>
 #include <Windows.h>
 #include "../kdmapper/kdmapper.hpp"
 #include "xorstr.hpp"
 
-#define BUF_SIZE (1024 * 10)
+typedef UINT (*PHookFn)(UINT, UINT, UINT);
 
-struct SHARED_MEM
-{
-	HANDLE hFile;
-	PVOID buf;
-};
+PHookFn DriverControl;
 
 std::string GenRandStr(const int len)
 {
@@ -73,11 +66,15 @@ auto GetLastErrorAsString() -> std::string
 int main()
 {
 	std::cout << "[>] Loading rwdrv" << std::endl;
+
+	srand(static_cast<unsigned>(time(nullptr)) * _getpid());
+
 	auto sc_handle = OpenSCManagerA(nullptr,
 	                                nullptr, SC_MANAGER_ENUMERATE_SERVICE);
 	if (!sc_handle)
 	{
-		std::cout << xorstr_("[-] Error occured while loading service manager: ") << GetLastErrorAsString() << std::endl;
+		std::cout << xorstr_("[-] Error occured while loading service manager: ") << GetLastErrorAsString() << std::
+			endl;
 		return 1;
 	}
 
@@ -85,69 +82,96 @@ int main()
 	// DWORD servicesCount;
 	// DWORD resumeHandle;
 	//
-	// std::cout << xorstr_("[>] Checking for BattlEye service") << std::endl;
+	//std::cout << xorstr_("[>] Checking for BattlEye service") << std::endl;
 	//
-	// EnumServicesStatusA(
-	// 	sc_handle,
-	// 	SERVICE_WIN32,
-	// 	SERVICE_ACTIVE,
-	// 	NULL,
-	// 	0,
-	// 	&servicesBufSize,
-	// 	&servicesCount,
-	// 	&resumeHandle
-	// );
+	//EnumServicesStatusA(
+	//	sc_handle,
+	//	SERVICE_WIN32,
+	//	SERVICE_ACTIVE,
+	//	NULL,
+	//	0,
+	//	&servicesBufSize,
+	//	&servicesCount,
+	//	&resumeHandle
+	//);
 	//
-	// auto svcBuf = new BYTE[servicesBufSize];
-	// if (!EnumServicesStatusA(
-	// 	sc_handle,
-	// 	SERVICE_WIN32,
-	// 	SERVICE_ACTIVE,
-	// 	LPENUM_SERVICE_STATUSA(svcBuf),
-	// 	servicesBufSize,
-	// 	&servicesBufSize,
-	// 	&servicesCount,
-	// 	&resumeHandle
-	// ))
-	// {
-	// 	std::cout << xorstr_("[-] Failed to enumerate all services: ") << GetLastErrorAsString() << std::endl;
-	// 	return 1;
-	// }
+	//auto svcBuf = new BYTE[servicesBufSize];
+	//if (!EnumServicesStatusA(
+	//	sc_handle,
+	//	SERVICE_WIN32,
+	//	SERVICE_ACTIVE,
+	//	LPENUM_SERVICE_STATUSA(svcBuf),
+	//	servicesBufSize,
+	//	&servicesBufSize,
+	//	&servicesCount,
+	//	&resumeHandle
+	//))
+	//{
+	//	std::cout << xorstr_("[-] Failed to enumerate all services: ") << GetLastErrorAsString() << std::endl;
+	//	return 1;
+	//}
 	//
-	// for (DWORD i = 0; i < servicesCount; i++)
-	// {
-	// 	if (strcmp(LPENUM_SERVICE_STATUSA(svcBuf)[i].lpServiceName, "BEService") == 0)
-	// 	{
-	// 		std::cout << xorstr_("[-] BEService is running, close the game before loading the cheat.") << std::endl;
-	// 		return 1;
-	// 	}
-	// }
+	//for (DWORD i = 0; i < servicesCount; i++)
+	//{
+	//	if (strcmp(LPENUM_SERVICE_STATUSA(svcBuf)[i].lpServiceName, "BEService") == 0)
+	//	{
+	//		std::cout << xorstr_("[-] BEService is running, close the game before loading the cheat.") << std::endl;
+	//		return 1;
+	//	}
+	//}
 
-	if (intel_driver::IsRunning())
+	const auto iqvw64e_device_handle = intel_driver::Load();
+
+	if (!iqvw64e_device_handle || iqvw64e_device_handle == INVALID_HANDLE_VALUE)
 	{
-		std::cout << xorstr_("[-] \\Device\\Nal already exists, unload iqwv64e.sys to proceed");
-		return 1;
+		std::cout << xorstr_("[-] Failed to load driver iqvw64e.sys") << std::endl;
+		intel_driver::Unload(iqvw64e_device_handle);
+		return -1;
 	}
 
-	const auto intel_drv_handle = intel_driver::Load();
-
-	if (!intel_drv_handle || intel_drv_handle == INVALID_HANDLE_VALUE)
+	if (!intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle))
 	{
-		std::cout << xorstr_("[-] Failed to load vulnerable intel driver\n");
-		return 1;
+		std::cout << xorstr_("[-] Failed to ClearPiDDBCacheTable") << std::endl;
+		intel_driver::Unload(iqvw64e_device_handle);
+		return -1;
 	}
 
-	std::cout << xorstr_("[>] Mapping driver and calling DriverEntry") << std::endl;
-
-	if (!kdmapper::MapDriver(intel_drv_handle, (ExePath() + xorstr_("\\rwdrv.sys"))))
+	if (!kdmapper::MapDriver(iqvw64e_device_handle, ExePath() + xorstr_("\\rwdrv.sys")))
 	{
 		std::cout << xorstr_("[-] Failed to map rwdrv") << std::endl;
-		intel_driver::Unload(intel_drv_handle);
+		intel_driver::Unload(iqvw64e_device_handle);
+		return -1;
+	}
+
+	intel_driver::Unload(iqvw64e_device_handle);
+	std::cout << xorstr_("[>] Successfully loaded kernel mode component, initializing") << std::endl;
+
+	const auto mod = GetModuleHandleA(xorstr_("User32.dll"));
+
+	if (!mod)
+	{
+		std::cout << xorstr_("[-] Failed to load User32.dll") << std::endl;
 		return 1;
 	}
-	
-	intel_driver::Unload(intel_drv_handle);
 
-	
-	return 0;
+	DriverControl = PHookFn(GetProcAddress(
+		mod,
+		xorstr_("OpenInputDesktop")
+	));
+
+	if (!DriverControl)
+	{
+		std::cout << xorstr_("[-] Failed to obtain the address of the hooked routine") << std::endl;
+		return 1;
+	}
+
+	std::cout << xorstr_("[>] Spoofing disk serials and clearing BigPoolTable") << std::endl;
+	const auto rv = DriverControl(0xDEADBEEF, NULL, NULL);
+	if (!NT_SUCCESS(rv))
+	{
+		std::cout << xorstr_("[-] Spoofing disks / clearing BigPoolTable failed. See kernel debug log for more details") << std::endl;
+		return 1;
+	}
+	std::cout << xorstr_("[+] Successfully spoofed disk serials") << std::endl;
+	std::cout << xorstr_("[+] Successfully cleared BigPoolTable") << std::endl;
 }

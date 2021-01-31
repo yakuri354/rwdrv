@@ -2,6 +2,38 @@
 
 using namespace Search;
 
+extern DriverState g_driverState;
+
+NTSTATUS Clear::SpoofDiskSerials()
+{
+	// Pasted from
+	// https://www.unknowncheats.me/forum/anti-cheat-bypass/425937-spoofing-disk-smart-serials-hooks-technically.html
+	
+	log(skCrypt("[rwdrv] Spoofing disk serials\n"));
+	UNICODE_STRING driverDisk;
+	RtlInitUnicodeString(&driverDisk, L"\\Driver\\Disk");
+
+	PDRIVER_OBJECT driverObject;
+	const auto status = ObReferenceObjectByName(
+		&driverDisk,
+		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+		nullptr,
+		NULL,
+		*IoDriverObjectType,
+		KernelMode,
+		nullptr,
+		reinterpret_cast<PVOID*>(&driverObject)
+	);
+	if (!NT_SUCCESS(status))
+		return STATUS_UNSUCCESSFUL;
+
+	g_driverState.OriginalDiskDispatchFn = driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL];
+
+	driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION];
+
+	ObDereferenceObject(driverObject);
+	return STATUS_SUCCESS;
+}
 
 bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
 {
@@ -73,17 +105,7 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID64 pageAddr)
 	SIZE_T bigPoolTableSize;
 	PPOOL_TRACKER_BIG_PAGES pPoolBigPageTable;
 
-	log(skCrypt("[rwdrv] Retrieving Windows version\n"));
-
-	RTL_OSVERSIONINFOW winver;
-
-	if (!RtlGetVersion(&winver))
-	{
-		log(skCrypt("[rwdrv] Retrieving Windows version failed\n"));
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	log(skCrypt("[rwdrv] Windows version %ul\n"), winver.dwMajorVersion);
+	log(skCrypt("[rwdrv] Clearing SystemBigPoolInfo\n"));
 
 
 	if (!FindBigPoolTable(&pPoolBigPageTable, &bigPoolTableSize))
@@ -96,27 +118,27 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID64 pageAddr)
 		}
 	}
 
-	log(skCrypt("[rwdrv] Successfully found BigPoolTable at [%X], size %X\n"), pPoolBigPageTable, bigPoolTableSize);
+	log(skCrypt("[rwdrv] Successfully found BigPoolTable at [0x%p], size %Iu\n"), pPoolBigPageTable, bigPoolTableSize);
 
-	PPOOL_TRACKER_BIG_PAGES PoolBigPageTable = nullptr;
-	RtlCopyMemory(&PoolBigPageTable, static_cast<PVOID>(pPoolBigPageTable), 8);
+	PPOOL_TRACKER_BIG_PAGES poolBigPageTable = nullptr;
+	RtlCopyMemory(&poolBigPageTable, static_cast<PVOID>(pPoolBigPageTable), 8);
 
 	for (size_t i = 0; i < bigPoolTableSize; i++)
 	{
-		if (PoolBigPageTable[i].Va == ULONGLONG(pageAddr) || PoolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
+		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
 		{
-			log(skCrypt("Found an entry in BigPoolTable [%X], Tag: %X, Size: %u\n"),
-			    PoolBigPageTable[i].Va,
-			    PoolBigPageTable[i].Key,
-			    PoolBigPageTable[i].NumberOfBytes);
-			PoolBigPageTable[i].Va = 0x1;
-			PoolBigPageTable[i].NumberOfBytes = 0x0;
+			log(skCrypt("[rwdrv] Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [%lld]\n"),
+			    PVOID(poolBigPageTable[i].Va),
+			    poolBigPageTable[i].Key,
+			    poolBigPageTable[i].NumberOfBytes);
+			poolBigPageTable[i].Va = 0x1;
+			poolBigPageTable[i].NumberOfBytes = 0x0;
 			return STATUS_SUCCESS;
 		}
 	}
 
-	log(skCrypt("Entry [%X] in BigPoolTable not found!\n"), pageAddr);
-	return STATUS_UNSUCCESSFUL;
+	log(skCrypt("Entry in BigPoolTable not found!\n"));
+	return STATUS_SUCCESS;
 }
 
 NTSTATUS Clear::ClearPfnDatabase()

@@ -1,15 +1,21 @@
 #pragma once
-
-#include "ntdll.h"
+#include <Windows.h>
+#include <winternl.h>
+#pragma comment(lib, "ntdll.lib")
 
 namespace nt
 {
+	constexpr auto PAGE_SIZE = 0x1000;
 	constexpr auto STATUS_INFO_LENGTH_MISMATCH = 0xC0000004;
 
 	constexpr auto SystemModuleInformation = 11;
 	constexpr auto SystemHandleInformation = 16;
 	constexpr auto SystemExtendedHandleInformation = 64;
 	
+	typedef NTSTATUS(*NtLoadDriver)(PUNICODE_STRING DriverServiceName);
+	typedef NTSTATUS(*NtUnloadDriver)(PUNICODE_STRING DriverServiceName);
+	typedef NTSTATUS(*RtlAdjustPrivilege)(_In_ ULONG Privilege, _In_ BOOLEAN Enable, _In_ BOOLEAN Client, _Out_ PBOOLEAN WasEnabled);
+
 	typedef struct _SYSTEM_HANDLE
 	{
 		PVOID Object;
@@ -29,7 +35,7 @@ namespace nt
 		SYSTEM_HANDLE Handles[1];
 	} SYSTEM_HANDLE_INFORMATION_EX, *PSYSTEM_HANDLE_INFORMATION_EX;
 
-	typedef enum _POOL_TYPE {
+	typedef enum class _POOL_TYPE {
 		NonPagedPool,
 		NonPagedPoolExecute,
 		PagedPool,
