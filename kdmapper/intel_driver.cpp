@@ -274,7 +274,7 @@ uint64_t intel_driver::GetKernelModuleExport(HANDLE device_handle, uint64_t kern
 	if (!export_base || !export_base_size)
 		return 0;
 
-	const auto export_data = reinterpret_cast<PIMAGE_EXPORT_DIRECTORY>(VirtualAlloc(nullptr, export_base_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+	auto* const export_data = static_cast<PIMAGE_EXPORT_DIRECTORY>(VirtualAlloc(nullptr, export_base_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
 
 	if (!ReadMemory(device_handle, kernel_module_base + export_base, export_data, export_base_size))
 	{
@@ -284,13 +284,13 @@ uint64_t intel_driver::GetKernelModuleExport(HANDLE device_handle, uint64_t kern
 
 	const auto delta = reinterpret_cast<uint64_t>(export_data) - export_base;
 
-	const auto name_table = reinterpret_cast<uint32_t*>(export_data->AddressOfNames + delta);
-	const auto ordinal_table = reinterpret_cast<uint16_t*>(export_data->AddressOfNameOrdinals + delta);
-	const auto function_table = reinterpret_cast<uint32_t*>(export_data->AddressOfFunctions + delta);
+	auto* const name_table = reinterpret_cast<uint32_t*>(export_data->AddressOfNames + delta);
+	auto* const ordinal_table = reinterpret_cast<uint16_t*>(export_data->AddressOfNameOrdinals + delta);
+	auto* const function_table = reinterpret_cast<uint32_t*>(export_data->AddressOfFunctions + delta);
 
 	for (auto i = 0u; i < export_data->NumberOfNames; ++i)
 	{
-		const std::string current_function_name = std::string(reinterpret_cast<char*>(name_table[i] + delta));
+		const auto current_function_name = std::string(reinterpret_cast<char*>(name_table[i] + delta));
 
 		if (!_stricmp(current_function_name.c_str(), function_name.c_str()))
 		{
@@ -617,7 +617,7 @@ uintptr_t intel_driver::FindSectionAtKernel(HANDLE device_handle, char* sectionN
 	return section - (uintptr_t)headers + modulePtr;
 }
 
-uintptr_t intel_driver::FindPatternInSectionAtKernel(HANDLE device_handle,char* sectionName, uintptr_t modulePtr, BYTE* bMask, char* szMask) {
+uintptr_t intel_driver::FindPatternInSectionAtKernel(HANDLE device_handle, char* sectionName, uintptr_t modulePtr, BYTE* bMask, char* szMask) {
 	ULONG sectionSize = 0;
 	uintptr_t section = FindSectionAtKernel(device_handle, sectionName, modulePtr, &sectionSize);
 	return FindPatternAtKernel(device_handle, section, sectionSize, bMask, szMask);

@@ -76,44 +76,21 @@ bool InitDriver()
 
 	LARGE_INTEGER va;
 
-	va.QuadPart = __int64(g::State.Memory);
+	va.QuadPart = INT64(g::State.Memory);
 
-	log(xs("[umc] Making first init call, Va [%p]\n"), PVOID(va.QuadPart));
+	log(xs("[umc] Making init call, Va [%p]\n"), PVOID(va.QuadPart));
 
-	auto status = DriverCtl(va.LowPart, va.HighPart);
-
-	if (!NT_SUCCESS(status))
-	{
-		log(xs("[umc] First init call failed with status %x\n"), status);
-		return false;
-	}
-
-	const auto pid = GetCurrentProcessId();
-
-	log(xs("[umc] Making second call, PID %d\n"), pid);
-	status = DriverCtl(pid);
+	const auto status = DriverCtl(va.LowPart, va.HighPart);
 
 	if (!NT_SUCCESS(status))
 	{
-		log(xs("[umc] Second init call failed with status %x\n"), status);
+		log(xs("[umc] Init call failed with status %x\n"), status);
 		return false;
 	}
 
-	if (*static_cast<unsigned*>(g::State.Memory) == CTL_MAGIC) {
-		log(xs("[umc] Probe write was successful"));
-	} else
+	if (!(*static_cast<unsigned*>(g::State.Memory) == CTL_MAGIC))
 	{
 		log(xs("[umc] Probe write failed"));
-		return false;
-	}
-
-	log(xs("[umc] Making final call\n"));
-
-	status = DriverCtl(Ctl::INIT_FINAL);
-
-	if (!NT_SUCCESS(status))
-	{
-		log(xs("[umc] Final init call failed with status %x\n"), status);
 		return false;
 	}
 
@@ -140,7 +117,7 @@ DWORD WINAPI RealMain(void* param)
 
 	log(xs("[umc] Retrieving hooked fn\n"));
 
-	const auto mod = GetModuleHandleA(HOOKED_FN_MODULE);
+	auto* const mod = GetModuleHandleA(HOOKED_FN_MODULE);
 	if (!mod)
 	{
 		log(xs("[umc] Could not find module %s\n"), HOOKED_FN_MODULE);

@@ -48,7 +48,7 @@ uint64_t utils::GetKernelModuleAddress(const std::string& module_name)
 		return 0;
 	}
 
-	const auto modules = static_cast<nt::PRTL_PROCESS_MODULES>(buffer);
+	auto* const modules = static_cast<nt::PRTL_PROCESS_MODULES>(buffer);
 
 	for (auto i = 0u; i < modules->NumberOfModules; ++i)
 	{

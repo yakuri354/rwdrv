@@ -272,7 +272,6 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cache.cpp" />
     <ClCompile Include="clean.cpp" />
     <ClCompile Include="control.cpp" />
     <ClCompile Include="main.cpp" />

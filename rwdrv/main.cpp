@@ -3,10 +3,12 @@
 #include "common.hpp"
 #include "clean.hpp"
 #include "search.hpp"
+#include "cache.hpp"
 #include "util.hpp"
 #include "skcrypt.hpp"
 #include "comms.hpp"
 
+PVOID g::KernelBase;
 
 struct SharedMem
 {
@@ -21,7 +23,7 @@ struct _DriverState
 	PHookFn HookControl;
 	PHookFn OriginalHookedFn;
 	PDRIVER_DISPATCH OriginalDiskDispatchFn;
-	 SharedMemory;
+	PVOID SharedMemory;
 };
 
 namespace g
@@ -60,73 +62,27 @@ UINT __fastcall HookControl(UINT a1, UINT a2, UINT a3)
 	{
 		if (!g::DriverState.Initialized)
 		{
-			if (g::DriverState.SharedMemory.Va == nullptr)
+			LARGE_INTEGER ptr = {};
+
+			ptr.LowPart = a2;
+			ptr.HighPart = a3;
+
+			log(skCrypt("[rwdrv] Initializing; Setting shared memory Va to [%p]\n"), PVOID(ptr.QuadPart));
+
+			g::DriverState.SharedMemory = PVOID(ptr.QuadPart);
+
+			log(skCrypt("[rwdrv] Testing shmem Va "));
+
+			if (MmIsAddressValid(g::DriverState.SharedMemory))
 			{
-				LARGE_INTEGER ptr = {};
-
-				ptr.LowPart = a2;
-				ptr.HighPart = a3;
-
-				log(skCrypt("[rwdrv] Init step 1; Setting shared memory Va to [%p]\n"), PVOID(ptr.QuadPart));
-
-				g::DriverState.SharedMemory.Va = PVOID(ptr.QuadPart);
-
-				return STATUS_SUCCESS;
+				*static_cast<unsigned*>(g::DriverState.SharedMemory) = CTL_MAGIC;
 			}
-			if (g::DriverState.SharedMemory.Pid == 0)
+			else
 			{
-				log(skCrypt("[rwdrv] Init step 2; Setting shared memory PID (%u)\n"), a2);
-
-				g::DriverState.SharedMemory.Pid = a2;
-				auto status =
-					PsLookupProcessByProcessId(
-						HANDLE(a2),
-						&g::DriverState.SharedMemory.Proc
-					);
-
-				if (!NT_SUCCESS(status))
-				{
-					log(skCrypt("[rwdrv] PsLookupByProcessId failed\n"));
-					return status;
-				}
-
-				log(skCrypt("[rwdrv] Making probe write to address [%p]\n"), g::DriverState.SharedMemory.Va);
-				
-				if (MmIsAddressValid(g::DriverState.SharedMemory.Va))
-				{
-					*static_cast<unsigned*>(g::DriverState.SharedMemory.Va) = CTL_MAGIC;
-				} else
-				{
-					log(skCrypt("[rwdrv] Bad shared memory Va\n"));
-				}
-
-				// log(skCrypt("Raw Address %d\n"), MmIsAddressValid(g::DriverState.SharedMemory.Va));
-				//
-				// char a = 0;
-				//
-				// SIZE_T bytesWritten{};
-				//
-				// log(skCrypt("MmCopyVirtualmemory %p %p %p %p %d UserMode %p\n"), PsGetCurrentProcess(), &a, g::DriverState.SharedMemory.Proc, g::DriverState.SharedMemory.Va, sizeof(char), &bytesWritten);
-				//
-				// if (!NT_SUCCESS(
-				// 	status = MmCopyVirtualMemory(
-				// 		PsGetCurrentProcess(),
-				// 		&a, 
-				// 		g::DriverState.SharedMemory.Proc,
-				// 		g::DriverState.SharedMemory.Va, 
-				// 		sizeof(char), 
-				// 		UserMode,
-				// 		&bytesWritten)
-				// ))
-				// {
-				// 	log(skCrypt("[rwdrv] Probe write to shared memory failed\n"));
-				// 	return status;
-				// }
-
-				return STATUS_SUCCESS;
+				log(skCrypt("[rwdrv] Bad shared memory Va\n"));
 			}
 
-			log(skCrypt("[rwdrv] Init step 3; Cleaning up misc traces\n"));
+			log(skCrypt("[rwdrv] Cleaning up traces"));
 
 			return CleanupMiscTraces();
 		}
@@ -163,21 +119,57 @@ NTSTATUS SetupHook()
 
 	log(skCrypt("[rwdrv] Function pointer location at [0x%p]\n"), PVOID(fnPtrLocation));
 
-	log(skCrypt("[rwdrv] Original function address: [0x%p]\n"), *reinterpret_cast<PVOID*>(fnPtrLocation));
+	log(skCrypt("[rwdrv] Original function address: [0x%p]\n"), *static_cast<PVOID*>(fnPtrLocation));
 
 	*reinterpret_cast<PVOID*>(&g::DriverState.OriginalHookedFn) = InterlockedExchangePointer(
-		reinterpret_cast<PVOID*>(fnPtrLocation), PVOID(HookControl));
+		static_cast<PVOID*>(fnPtrLocation), PVOID(HookControl));
 
 	log(skCrypt("[rwdrv] Successfully placed hook\n"));
 
 	return STATUS_SUCCESS;
 }
 
+bool CheckPEImage(PVOID imgBase)
+{
+	if (!imgBase)
+	{
+		return false;
+	}
 
-NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize)
+	auto* const pIdh = PIMAGE_DOS_HEADER(imgBase);
+
+	if (pIdh->e_magic != IMAGE_DOS_SIGNATURE)
+	{
+		return false;
+	}
+
+	auto* pInh = PIMAGE_NT_HEADERS(LPBYTE(imgBase) + pIdh->e_lfanew);
+
+	if (pInh->Signature != IMAGE_NT_SIGNATURE)
+	{
+		return false;
+	}
+
+	if (pInh->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
+	{
+		return false;
+	}
+	
+	return true;
+}
+
+
+NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
 {
 	g::DriverState.BaseAddress = baseAddr;
 	g::DriverState.ImageSize = imageSize;
+	if (!CheckPEImage(kernelBase))
+	{
+		log(skCrypt("[rwdrv] KernelBase invalid\n"));
+		return STATUS_UNSUCCESSFUL;
+	}
+	
+	g::KernelBase = kernelBase;
 
 	const auto status = Search::SetKernelProps();
 	if (!NT_SUCCESS(status))
@@ -188,16 +180,19 @@ NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize)
 	return status;
 }
 
-NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize)
+NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
 {
 	log(skCrypt("[rwdrv] Driver loaded at [0x%p]\n"), baseAddress);
 
-	auto status = InitRoutine(baseAddress, imageSize);
+	auto status = InitRoutine(baseAddress, imageSize, kernelBase);
 	if (!NT_SUCCESS(status))
 	{
 		log(skCrypt("[rwdrv] Driver initialization routine failed.\n"));
 		return status;
 	}
+
+	C_FN(DbgPrint)("Hello World!\n");
+	
 	status = SetupHook();
 	if (!NT_SUCCESS(status))
 	{

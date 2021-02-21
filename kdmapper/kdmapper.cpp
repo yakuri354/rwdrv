@@ -91,7 +91,9 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 
 		NTSTATUS status = 0;
 
-		if (!intel_driver::CallKernelFunction(iqvw64e_device_handle, &status, address_of_entry_point, realBase, image_size - TotalVirtualHeaderSize))
+		const auto kernelBase = utils::GetKernelModuleAddress("ntoskrnl.exe");
+
+		if (!intel_driver::CallKernelFunction(iqvw64e_device_handle, &status, address_of_entry_point, realBase, image_size - TotalVirtualHeaderSize, kernelBase))
 		{
 			std::cout << "[-] Failed to call driver entry" << std::endl;
 			kernel_image_base = realBase;

@@ -8,6 +8,11 @@
 
 constexpr ULONG BB_POOL_TAG = 'enoB';
 
+namespace g
+{
+	extern PVOID KernelBase;
+}
+
 constexpr bool NT_SUCCESS(NTSTATUS status)
 {
 	return status >= 0;

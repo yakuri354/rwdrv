@@ -36,9 +36,6 @@
     <ClCompile Include="util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cache.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="control.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
