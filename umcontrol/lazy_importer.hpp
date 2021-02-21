@@ -1,3 +1,4 @@
+#pragma once
 /*
  * Copyright 2018-2020 Justas Masiulis
  *
@@ -29,9 +30,9 @@
 // NOTE only std::forward is used from this header.
 // If there is a need to eliminate this dependency the function itself is very small.
 
+#include <utility>
+#include <cstddef>
 #include <intrin.h>
-
-typedef unsigned short wchat_t;;
 
 #ifndef LAZY_IMPORTER_NO_FORCEINLINE
 #if defined(_MSC_VER)

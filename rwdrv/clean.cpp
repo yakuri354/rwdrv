@@ -1,25 +1,55 @@
 #include "clean.hpp"
+#include "search.hpp"
+#include "skcrypt.hpp"
+#include "util.hpp"
 
 using namespace Search;
 
-extern DriverState g_driverState;
+// TODO Great refactor of pasted code
 
-NTSTATUS Clear::SpoofDiskSerials()
+NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDispatchAddress)
 {
 	// Pasted from
 	// https://www.unknowncheats.me/forum/anti-cheat-bypass/425937-spoofing-disk-smart-serials-hooks-technically.html
-	
+	UNREFERENCED_PARAMETER(kernelBase);
 	log(skCrypt("[rwdrv] Spoofing disk serials\n"));
+
 	UNICODE_STRING driverDisk;
-	RtlInitUnicodeString(&driverDisk, L"\\Driver\\Disk");
+
+	RtlUnicodeStringInit(&driverDisk, skCrypt(L"\\Driver\\Disk"));
+
+	UNICODE_STRING objName;
+	RtlUnicodeStringInit(&objName, skCrypt(L"IoDriverObjectType"));
+	const auto driverObjectType = // Yep, it does actually work
+		static_cast<POBJECT_TYPE*>(MmGetSystemRoutineAddress(&objName));
+
+	if (driverObjectType == nullptr)
+	{
+		log(skCrypt("[rwdrv] Failed to get IoDriverObjectType\n"));
+		return STATUS_UNSUCCESSFUL;
+	}
 
 	PDRIVER_OBJECT driverObject;
-	const auto status = ObReferenceObjectByName(
+
+	UNICODE_STRING fName;
+	RtlInitUnicodeString(&fName, skCrypt(L"ObReferenceObjectByName"));
+
+	const auto fnPtr = MmGetSystemRoutineAddress(&fName);
+
+	if (fnPtr == nullptr || !MmIsAddressValid(fnPtr))
+	{
+		log(skCrypt("[rwdrv] Failed to get address of ObReferenceObjectByName function\n"));
+		return STATUS_NOT_FOUND;
+	}
+
+	log(skCrypt("[rwdrv] calling [0x%p]\n"), PVOID(fnPtr));
+
+	const auto status = reinterpret_cast<_ObReferenceObjectByName*>(fnPtr)(
 		&driverDisk,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		nullptr,
 		NULL,
-		*IoDriverObjectType,
+		*driverObjectType,
 		KernelMode,
 		nullptr,
 		reinterpret_cast<PVOID*>(&driverObject)
@@ -27,43 +57,59 @@ NTSTATUS Clear::SpoofDiskSerials()
 	if (!NT_SUCCESS(status))
 		return STATUS_UNSUCCESSFUL;
 
-	g_driverState.OriginalDiskDispatchFn = driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL];
+	// *originalDispatchAddress = driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL];
+	//
+	// driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION];
 
-	driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION];
+	*originalDispatchAddress = PDRIVER_DISPATCH(InterlockedExchangePointer(
+		reinterpret_cast<void**>(&driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]),
+		driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]
+	));
 
 	ObDereferenceObject(driverObject);
+
 	return STATUS_SUCCESS;
 }
 
-bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
+NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 {
-	const auto ExProtectPoolExCallInstructionsAddress = PVOID(FindPattern(
-		reinterpret_cast<UINT64>(KernelBase),
-		KernelSize,
-		reinterpret_cast<BYTE*>(static_cast<char*>((
-				skCrypt("\xE8\x00\x00\x00\x00\x83\x67\x0C\x00"))
-		)),
-		skCrypt("x????xxxx")
-	));
+	// TODO Fix this
 
-	if (!ExProtectPoolExCallInstructionsAddress)
-		return false;
+	log(skCrypt("[rwdrv] Removing Pfn database entry\n"));
+	log(skCrypt("[rwdrv] Allocating MDL for address [%p] and size %ul\n"), pageAddress, pageSize);
+	const auto mdl = IoAllocateMdl(PVOID(pageAddress), pageSize, false, false, nullptr);
 
-	PVOID ExProtectPoolExAddress = ResolveRelativeAddress(ExProtectPoolExCallInstructionsAddress, 1, 5);
+	if (mdl == nullptr)
+	{
+		log(skCrypt("[rwdrv] MDL allocation failed\n"));
+		return STATUS_UNSUCCESSFUL;
+	}
 
-	if (!ExProtectPoolExAddress)
-		return false;
+	const auto mdlPages = MmGetMdlPfnArray(mdl);
+	if (!mdlPages)
+	{
+		log(skCrypt("[rwdrv] MmGetMdlPfnArray failed\n"));
+		return STATUS_UNSUCCESSFUL;
+	}
 
-	const auto PoolBigPageTableInstructionAddress = PVOID(ULONG64(ExProtectPoolExAddress) + 0x95);
-	*pPoolBigPageTable = reinterpret_cast<PPOOL_TRACKER_BIG_PAGES>(
-		ResolveRelativeAddress(PoolBigPageTableInstructionAddress, 3, 7));
+	const ULONG mdlPageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(MmGetMdlVirtualAddress(mdl), MmGetMdlByteCount(mdl));
 
-	const auto PoolBigPageTableSizeInstructionAddress = PVOID(ULONG64(ExProtectPoolExAddress) + 0x8E);
-	*pPoolBigPageTableSize = *static_cast<SIZE_T*>(
-		ResolveRelativeAddress(PoolBigPageTableSizeInstructionAddress, 3, 7));
+	log(skCrypt("[rwdrv] MDL page count: &ul\n"), mdlPageCount);
 
-	return true;
+	ULONG nullPfn = 0x0;
+	MM_COPY_ADDRESS sourceAddress{};
+	sourceAddress.VirtualAddress = &nullPfn;
+
+	for (ULONG i = 0; i < mdlPageCount; i++)
+	{
+		size_t bytes = 0;
+		MmCopyMemory(&mdlPages[i], sourceAddress, sizeof(ULONG), MM_COPY_MEMORY_VIRTUAL, &bytes);
+	}
+
+	log(skCrypt("[rwdrv] Successfully cleared Pfn database\n"));
+	return STATUS_SUCCESS;
 }
+
 
 BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* poolBigPageTableSize) // FIXME
 {
@@ -99,8 +145,37 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* pool
 	return true;
 }
 
+bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
+{
+	const auto exProtectPoolExCallInstructionsAddress = PVOID(FindPattern(
+		reinterpret_cast<UINT64>(KernelBase),
+		KernelSize,
+		reinterpret_cast<BYTE*>(static_cast<char*>((
+				skCrypt("\xE8\x00\x00\x00\x00\x83\x67\x0C\x00"))
+		)),
+		skCrypt("x????xxxx")
+	));
 
-NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID64 pageAddr)
+	if (!exProtectPoolExCallInstructionsAddress)
+		return false;
+
+	auto exProtectPoolExAddress = ResolveRelativeAddress(exProtectPoolExCallInstructionsAddress, 1, 5);
+
+	if (!exProtectPoolExAddress)
+		return false;
+
+	const auto poolBigPageTableInstructionAddress = PVOID(ULONG64(exProtectPoolExAddress) + 0x95);
+	*pPoolBigPageTable = reinterpret_cast<PPOOL_TRACKER_BIG_PAGES>(
+		ResolveRelativeAddress(poolBigPageTableInstructionAddress, 3, 7));
+
+	const auto poolBigPageTableSizeInstructionAddress = PVOID(ULONG64(exProtectPoolExAddress) + 0x8E);
+	*pPoolBigPageTableSize = *static_cast<SIZE_T*>(
+		ResolveRelativeAddress(poolBigPageTableSizeInstructionAddress, 3, 7));
+
+	return true;
+}
+
+NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 {
 	SIZE_T bigPoolTableSize;
 	PPOOL_TRACKER_BIG_PAGES pPoolBigPageTable;
@@ -123,8 +198,11 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID64 pageAddr)
 	PPOOL_TRACKER_BIG_PAGES poolBigPageTable = nullptr;
 	RtlCopyMemory(&poolBigPageTable, static_cast<PVOID>(pPoolBigPageTable), 8);
 
+	log(skCrypt("[rwdrv] Searching for address [%p]\n"), pageAddr);
+
 	for (size_t i = 0; i < bigPoolTableSize; i++)
 	{
+		// log("%p %lld\n", poolBigPageTable[i].Va, poolBigPageTable[i].NumberOfBytes);
 		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
 		{
 			log(skCrypt("[rwdrv] Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [%lld]\n"),
@@ -137,12 +215,6 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID64 pageAddr)
 		}
 	}
 
-	log(skCrypt("Entry in BigPoolTable not found!\n"));
-	return STATUS_SUCCESS;
-}
-
-NTSTATUS Clear::ClearPfnDatabase()
-{
-	// TODO
+	log(skCrypt("[rwdrv] Entry in BigPoolTable not found!\n"));
 	return STATUS_SUCCESS;
 }

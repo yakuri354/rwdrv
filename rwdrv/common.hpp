@@ -1,10 +1,24 @@
 #pragma once
-#include <ntdef.h>
+#ifndef NO_DDK
 #include <ntddk.h>
+#endif
+#include <windef.h>
 #include <ntimage.h>
-#include <ntstrsafe.h>
+#undef NT_SUCCESS
 
-typedef unsigned char BYTE;
+constexpr ULONG BB_POOL_TAG = 'enoB';
+
+constexpr bool NT_SUCCESS(NTSTATUS status)
+{
+	return status >= 0;
+}
+
+template <typename ...A>
+constexpr ULONG log(PCSTR format, A ...args)
+{
+	return DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, args...);
+}
+
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION
 {
@@ -18,13 +32,13 @@ typedef struct _RTL_PROCESS_MODULE_INFORMATION
 	USHORT LoadCount;
 	USHORT OffsetToFileName;
 	UCHAR FullPathName[MAXIMUM_FILENAME_LENGTH];
-} RTL_PROCESS_MODULE_INFORMATION, *PRTL_PROCESS_MODULE_INFORMATION;
+} RTL_PROCESS_MODULE_INFORMATION, * PRTL_PROCESS_MODULE_INFORMATION;
 
 typedef struct _RTL_PROCESS_MODULES
 {
 	ULONG NumberOfModules;
 	RTL_PROCESS_MODULE_INFORMATION Modules[1];
-} RTL_PROCESS_MODULES, *PRTL_PROCESS_MODULES;
+} RTL_PROCESS_MODULES, * PRTL_PROCESS_MODULES;
 
 struct PiDDBCacheEntry
 {
@@ -211,12 +225,35 @@ ZwQuerySystemInformation(
 	OUT PULONG ReturnLength OPTIONAL
 );
 
-#define MM_UNLOADED_DRIVERS_SIZE 50
 
-typedef struct _MM_UNLOADED_DRIVER
+typedef struct _POOL_TRACKER_BIG_PAGES
 {
-	UNICODE_STRING Name;
-	PVOID ModuleStart;
-	PVOID ModuleEnd;
-	ULONG64 UnloadTime;
-} MM_UNLOADED_DRIVER, *PMM_UNLOADED_DRIVER;
+	volatile ULONGLONG Va;                                                  //0x0
+	ULONG Key;                                                              //0x8
+	ULONG Pattern;                                                        //0xc
+	ULONG PoolType;                                                      //0xc
+	ULONG SlushSize;                                                     //0xc
+	ULONGLONG NumberOfBytes;                                                //0x10
+} POOL_TRACKER_BIG_PAGES, * PPOOL_TRACKER_BIG_PAGES;
+
+typedef NTSTATUS(NTAPI _ObReferenceObjectByName)(
+	PUNICODE_STRING ObjectPath,
+	ULONG Attributes,
+	PACCESS_STATE PassedAccessState OPTIONAL,
+	ACCESS_MASK DesiredAccess OPTIONAL,
+	POBJECT_TYPE ObjectType,
+	KPROCESSOR_MODE AccessMode,
+	PVOID ParseContext OPTIONAL,
+	PVOID* ObjectPtr);
+
+EXTERN_C __declspec(dllimport)
+NTSTATUS NTAPI MmCopyVirtualMemory
+(
+	PEPROCESS SourceProcess,
+	PVOID SourceAddress,
+	PEPROCESS TargetProcess,
+	PVOID TargetAddress,
+	SIZE_T BufferSize,
+	KPROCESSOR_MODE PreviousMode,
+	PSIZE_T ReturnSize
+);

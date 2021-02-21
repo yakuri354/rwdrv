@@ -33,6 +33,12 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="control.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -41,19 +47,25 @@
     <ClInclude Include="clean.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="struct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="skcrypt.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lazy_importer.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="search.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="common.h">
+    <ClInclude Include="skcrypt.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="common.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="util.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="comms.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cache.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="control.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

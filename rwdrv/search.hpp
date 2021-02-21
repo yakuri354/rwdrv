@@ -1,12 +1,13 @@
 #pragma once
-#include "common.h"
-#include "skcrypt.h"
+#include "common.hpp"
 
 namespace Search {
 	extern PVOID KernelBase;
 	extern ULONG KernelSize;
 	extern PVOID Win32kBase;
 	extern ULONG Win32kSize;
+	extern PVOID CIBase;
+	extern ULONG CISize;
 
 	NTSTATUS SetKernelProps();
 	extern "C" PVOID ResolveRelativeAddress(

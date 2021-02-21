@@ -165,13 +165,13 @@
     <None Include="..\x64\Debug\rwdrv.sys" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="lazy_importer.hpp" />
+    <ClInclude Include="xorstr.hpp" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\kdmapper\kdmapper.vcxproj">
       <Project>{518e0636-ba8f-459d-acac-81bd33475e3e}</Project>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="lazy_importer.hpp" />
-    <ClInclude Include="xorstr.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
