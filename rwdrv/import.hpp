@@ -4,7 +4,10 @@
 #define C_FN(name) (LazyFn<decltype(name)>(skCrypt(#name)))
 
 template <typename Fn>
-__forceinline Fn* LazyFn(const char* name)
+#ifndef DEBUG
+__forceinline
+#endif
+Fn* LazyFn(const char* name)
 {
 	auto* const peHeader = PIMAGE_DOS_HEADER(g::KernelBase);
 

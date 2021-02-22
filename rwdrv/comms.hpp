@@ -1,8 +1,8 @@
 #pragma once
 #define CTLCODE constexpr unsigned
 
-constexpr char HOOKED_FN_NAME[] = "OpenInputDesktop";
-constexpr char HOOKED_FN_MODULE[] = "User32.dll";
+#define HOOKED_FN_NAME "OpenInputDesktop"
+#define HOOKED_FN_MODULE "User32.dll"
 
 CTLCODE CTL_MAGIC = 0xDEADBEEF;
 

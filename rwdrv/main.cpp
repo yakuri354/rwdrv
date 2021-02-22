@@ -3,7 +3,6 @@
 #include "common.hpp"
 #include "clean.hpp"
 #include "search.hpp"
-#include "cache.hpp"
 #include "util.hpp"
 #include "skcrypt.hpp"
 #include "comms.hpp"
@@ -73,7 +72,7 @@ UINT __fastcall HookControl(UINT a1, UINT a2, UINT a3)
 
 			log(skCrypt("[rwdrv] Testing shmem Va "));
 
-			if (MmIsAddressValid(g::DriverState.SharedMemory))
+			if (C_FN(MmIsAddressValid)(g::DriverState.SharedMemory))
 			{
 				*static_cast<unsigned*>(g::DriverState.SharedMemory) = CTL_MAGIC;
 			}
@@ -163,15 +162,8 @@ NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
 {
 	g::DriverState.BaseAddress = baseAddr;
 	g::DriverState.ImageSize = imageSize;
-	if (!CheckPEImage(kernelBase))
-	{
-		log(skCrypt("[rwdrv] KernelBase invalid\n"));
-		return STATUS_UNSUCCESSFUL;
-	}
-	
-	g::KernelBase = kernelBase;
 
-	const auto status = Search::SetKernelProps();
+	const auto status = Search::SetKernelProps(kernelBase);
 	if (!NT_SUCCESS(status))
 	{
 		log(skCrypt("[rwdrv] Failed to obtain kernel modules\n"));
@@ -182,6 +174,14 @@ NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
 
 NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
 {
+	// Cannot use logging until g::KernelBase is set
+	
+	if (!CheckPEImage(kernelBase))
+	{
+		return STATUS_INVALID_PARAMETER;
+	}
+	g::KernelBase = kernelBase;
+
 	log(skCrypt("[rwdrv] Driver loaded at [0x%p]\n"), baseAddress);
 
 	auto status = InitRoutine(baseAddress, imageSize, kernelBase);
@@ -190,8 +190,6 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
 		log(skCrypt("[rwdrv] Driver initialization routine failed.\n"));
 		return status;
 	}
-
-	C_FN(DbgPrint)("Hello World!\n");
 	
 	status = SetupHook();
 	if (!NT_SUCCESS(status))

@@ -8,32 +8,24 @@ ULONG Search::KernelSize = 0;
 PVOID Search::Win32kBase = nullptr;
 ULONG Search::Win32kSize = 0;
 
-NTSTATUS Search::SetKernelProps()
+NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 {
-	NTSTATUS status;
 	ULONG bytes = 0;
 
-	// Already found
 	if (KernelBase != nullptr && KernelSize != 0
 		&& Win32kBase != nullptr && Win32kSize != 0)
 	{
 		return STATUS_SUCCESS;
 	}
-	UNICODE_STRING routineName;
-	RtlInitUnicodeString(&routineName, skCrypt(L"NtOpenFile"));
 
-	const auto checkPtr = MmGetSystemRoutineAddress(&routineName);
-	if (checkPtr == nullptr)
-		return STATUS_UNSUCCESSFUL;
-	// Protect from UserMode AV
-	status = ZwQuerySystemInformation(SystemModuleInformation, nullptr, bytes, &bytes);
+	auto status = C_FN(ZwQuerySystemInformation)(SystemModuleInformation, nullptr, bytes, &bytes);
 	if (bytes == 0)
 	{
 		log(skCrypt("[rwdrv] Invalid SystemModuleInformation size\n"));
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	const auto pMods = static_cast<PRTL_PROCESS_MODULES>(ExAllocatePoolWithTag(
+	const auto pMods = static_cast<PRTL_PROCESS_MODULES>(C_FN(ExAllocatePoolWithTag)(
 		NonPagedPool, bytes, BB_POOL_TAG));
 
 	if (pMods == nullptr)
@@ -43,11 +35,9 @@ NTSTATUS Search::SetKernelProps()
 
 	RtlZeroMemory(pMods, bytes);
 
-	status = ZwQuerySystemInformation(SystemModuleInformation, pMods, bytes, &bytes);
+	status = C_FN(ZwQuerySystemInformation)(SystemModuleInformation, pMods, bytes, &bytes);
 
 	log(skCrypt("[rwdrv] Searching trough %d modules\n"), pMods->NumberOfModules);
-
-	// TODO Refactor module searching and make it less spaghetti
 
 	auto kf = false, wf = false;
 
@@ -58,10 +48,7 @@ NTSTATUS Search::SetKernelProps()
 		for (ULONG i = 0; i < pMods->NumberOfModules; i++)
 		{
 			if (!kf) {
-			
-				// System routine is inside module
-				if (checkPtr >= pMod[i].ImageBase &&
-					checkPtr < PVOID(PUCHAR(pMod[i].ImageBase) + pMod[i].ImageSize))
+				if (pMod[i].ImageBase == kernelBase)
 				{
 					KernelBase = pMod[i].ImageBase;
 					KernelSize = pMod[i].ImageSize;
@@ -88,7 +75,7 @@ NTSTATUS Search::SetKernelProps()
 	}
 
 	if (pMods) {
-		ExFreePoolWithTag(pMods, BB_POOL_TAG);
+		C_FN(ExFreePoolWithTag)(pMods, BB_POOL_TAG);
 	}
 
 	if (!wf || !kf)
@@ -98,9 +85,9 @@ NTSTATUS Search::SetKernelProps()
 	}
 	
 	log(skCrypt("[rwdrv] KernelBase: [0x%p]\n"), KernelBase);
-	//log(skCrypt("[rwdrv] KernelSize: [%d]\n"), KernelSize);
+	log(skCrypt("[rwdrv] KernelSize: [%d]\n"), KernelSize);
 	log(skCrypt("[rwdrv] Win32kBase: [0x%p]\n"), Win32kBase);
-	//log(skCrypt("[rwdrv] Win32kSize: [%d]\n"), Win32kSize);
+	log(skCrypt("[rwdrv] Win32kSize: [%d]\n"), Win32kSize);
 	return STATUS_SUCCESS;
 }
 

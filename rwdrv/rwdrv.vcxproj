@@ -279,7 +279,7 @@
     <ClCompile Include="util.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cache.hpp" />
+    <ClInclude Include="import.hpp" />
     <ClInclude Include="clean.hpp" />
     <ClInclude Include="common.hpp" />
     <ClInclude Include="comms.hpp" />

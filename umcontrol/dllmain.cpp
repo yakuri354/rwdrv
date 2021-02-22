@@ -6,7 +6,7 @@
 #include <Windows.h>
 #include "../loader/xorstr.hpp"
 
-#define log(...) {char cad[512]; sprintf_s(cad, __VA_ARGS__);  OutputDebugStringA(cad);}
+#define log(...) {char cad[512]; sprintf_s(cad, __VA_ARGS__);  LI_FN(OutputDebugStringA)(cad);}
 
 typedef long NTSTATUS;
 
@@ -55,8 +55,8 @@ PHookFn* _DriverCtl = nullptr;
 
 __forceinline unsigned DriverCtl(unsigned controlCode, unsigned additionalParam = NULL)
 {
-	//return (*_DriverCtl)(CTL_MAGIC, controlCode, additionalParam);
-	return unsigned(OpenInputDesktop(CTL_MAGIC, controlCode, additionalParam));
+	return (*_DriverCtl)(CTL_MAGIC, controlCode, additionalParam);
+	// return unsigned(OpenInputDesktop(CTL_MAGIC, controlCode, additionalParam));
 }
 
 struct State
@@ -103,7 +103,7 @@ DWORD WINAPI RealMain(void* param)
 {
 	log(xs("[umc] Starting initialization\n"));
 
-	g::State.Memory = VirtualAlloc(nullptr, SHMEM_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	g::State.Memory = LI_FN(VirtualAlloc)(nullptr, SHMEM_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
 	if (g::State.Memory == nullptr)
 	{
@@ -117,22 +117,19 @@ DWORD WINAPI RealMain(void* param)
 
 	log(xs("[umc] Retrieving hooked fn\n"));
 
-	auto* const mod = GetModuleHandleA(HOOKED_FN_MODULE);
-	if (!mod)
-	{
-		log(xs("[umc] Could not find module %s\n"), HOOKED_FN_MODULE);
-		return -1;
-	}
+	// _DriverCtl = decltype(_DriverCtl)(GetProcAddress(mod, HOOKED_FN_NAME));
+	
+	// _DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, decltype(_DriverCtl)).get();
 
-	_DriverCtl = decltype(_DriverCtl)(GetProcAddress(mod, HOOKED_FN_NAME));
-
+	_DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn*).in(LI_MODULE(HOOKED_FN_MODULE).get());
+	
 	if (_DriverCtl == nullptr)
 	{
-		log(xs("[umc] Could not find function %s\n"), HOOKED_FN_NAME);
+		log(xs("[umc] Could not find function %s\n"), xs(HOOKED_FN_NAME));
 		return -1;
 	}
 
-	log(xs("[umc] Found hooked fn %s at %p\n"), HOOKED_FN_NAME, PVOID(_DriverCtl));
+	log(xs("[umc] Found hooked fn %s at %p\n"), xs(HOOKED_FN_NAME), PVOID(_DriverCtl));
 
 	if (!_DriverCtl || !InitDriver())
 	{
@@ -143,13 +140,12 @@ DWORD WINAPI RealMain(void* param)
 	while (true)
 	{
 		log(xs("[umc] Loop\n"));
-		Sleep(10000);
+		LI_FN(Sleep)(10000);
 	}
 
 	return 0;
 }
 
-// extern "C" __declspec(dllexport)
 BOOL APIENTRY DllMain(HMODULE hModule,
                       DWORD ul_reason_for_call,
                       LPVOID lpReserved
@@ -160,7 +156,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	if (ul_reason_for_call == DLL_PROCESS_ATTACH)
 	{
 		log(xs("[umc] Launching thread\n"));
-		CreateThread(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
+		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
 	}
 
 	return TRUE;

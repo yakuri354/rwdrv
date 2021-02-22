@@ -21,7 +21,10 @@
 #define LAZY_IMPORTER_HPP
 
 #define LI_FN(name) \
-    ::li::detail::lazy_function<::li::detail::khash(#name), decltype(&name)>()
+    ::li::detail::lazy_function<::li::detail::khash(#name), decltype(&(name))>()
+
+#define LI_FN_MANUAL(name, type) \
+	::li::detail::lazy_function<::li::detail::khash(name), type>()
 
 #define LI_FN_DEF(name) ::li::detail::lazy_function<::li::detail::khash(#name), name>()
 
@@ -499,10 +502,10 @@ namespace li {
             template<class T = void*, class Ldr>
             LAZY_IMPORTER_FORCEINLINE static T in(Ldr ldr) noexcept
             {
-                safe_module_enumerator e((const detail::win::LDR_DATA_TABLE_ENTRY_T*)(ldr));
+                safe_module_enumerator e(static_cast<const detail::win::LDR_DATA_TABLE_ENTRY_T*>(ldr));
                 do {
                     if (hash(e.value->BaseDllName) == Hash)
-                        return (T)(e.value->DllBase);
+                        return static_cast<T>(e.value->DllBase);
                 } while (e.next());
                 return {};
             }

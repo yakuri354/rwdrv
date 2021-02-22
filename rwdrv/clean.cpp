@@ -16,12 +16,12 @@ NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDis
 
 	UNICODE_STRING driverDisk;
 
-	RtlUnicodeStringInit(&driverDisk, skCrypt(L"\\Driver\\Disk"));
+	C_FN(RtlUnicodeStringInit)(&driverDisk, skCrypt(L"\\Driver\\Disk"));
 
 	UNICODE_STRING objName;
-	RtlUnicodeStringInit(&objName, skCrypt(L"IoDriverObjectType"));
+	C_FN(RtlUnicodeStringInit)(&objName, skCrypt(L"IoDriverObjectType"));
 	const auto driverObjectType = // Yep, it does actually work
-		static_cast<POBJECT_TYPE*>(MmGetSystemRoutineAddress(&objName));
+		static_cast<POBJECT_TYPE*>(C_FN(MmGetSystemRoutineAddress)(&objName));
 
 	if (driverObjectType == nullptr)
 	{
@@ -31,20 +31,7 @@ NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDis
 
 	PDRIVER_OBJECT driverObject;
 
-	UNICODE_STRING fName;
-	RtlInitUnicodeString(&fName, skCrypt(L"ObReferenceObjectByName"));
-
-	const auto fnPtr = MmGetSystemRoutineAddress(&fName);
-
-	if (fnPtr == nullptr || !MmIsAddressValid(fnPtr))
-	{
-		log(skCrypt("[rwdrv] Failed to get address of ObReferenceObjectByName function\n"));
-		return STATUS_NOT_FOUND;
-	}
-
-	log(skCrypt("[rwdrv] calling [0x%p]\n"), PVOID(fnPtr));
-
-	const auto status = reinterpret_cast<_ObReferenceObjectByName*>(fnPtr)(
+	const auto status = C_FN(ObReferenceObjectByName)(
 		&driverDisk,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		nullptr,
@@ -61,12 +48,13 @@ NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDis
 	//
 	// driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION];
 
-	*originalDispatchAddress = PDRIVER_DISPATCH(InterlockedExchangePointer(
-		reinterpret_cast<void**>(&driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]),
-		driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]
-	));
+	*originalDispatchAddress = PDRIVER_DISPATCH(
+		InterlockedExchangePointer(
+			reinterpret_cast<void**>(&driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]),
+			driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]
+		));
 
-	ObDereferenceObject(driverObject);
+	C_FN(ObfDereferenceObject)(driverObject);
 
 	return STATUS_SUCCESS;
 }
@@ -77,7 +65,7 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 
 	log(skCrypt("[rwdrv] Removing Pfn database entry\n"));
 	log(skCrypt("[rwdrv] Allocating MDL for address [%p] and size %ul\n"), pageAddress, pageSize);
-	const auto mdl = IoAllocateMdl(PVOID(pageAddress), pageSize, false, false, nullptr);
+	const auto mdl = C_FN(IoAllocateMdl)(PVOID(pageAddress), pageSize, false, false, nullptr);
 
 	if (mdl == nullptr)
 	{
@@ -103,7 +91,7 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 	for (ULONG i = 0; i < mdlPageCount; i++)
 	{
 		size_t bytes = 0;
-		MmCopyMemory(&mdlPages[i], sourceAddress, sizeof(ULONG), MM_COPY_MEMORY_VIRTUAL, &bytes);
+		C_FN(MmCopyMemory)(&mdlPages[i], sourceAddress, sizeof(ULONG), MM_COPY_MEMORY_VIRTUAL, &bytes);
 	}
 
 	log(skCrypt("[rwdrv] Successfully cleared Pfn database\n"));

@@ -59,10 +59,10 @@
     <ClInclude Include="comms.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cache.hpp">
+    <ClInclude Include="control.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="control.hpp">
+    <ClInclude Include="import.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

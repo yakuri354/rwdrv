@@ -5,6 +5,8 @@
 #include <windef.h>
 #include <ntimage.h>
 #undef NT_SUCCESS
+#include "import.hpp"
+#include "skcrypt.hpp"
 
 constexpr ULONG BB_POOL_TAG = 'enoB';
 
@@ -19,9 +21,9 @@ constexpr bool NT_SUCCESS(NTSTATUS status)
 }
 
 template <typename ...A>
-constexpr ULONG log(PCSTR format, A ...args)
+__forceinline ULONG log(PCSTR format, A ...args)
 {
-	return DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, args...);
+	return C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, args...);
 }
 
 
@@ -241,7 +243,7 @@ typedef struct _POOL_TRACKER_BIG_PAGES
 	ULONGLONG NumberOfBytes;                                                //0x10
 } POOL_TRACKER_BIG_PAGES, * PPOOL_TRACKER_BIG_PAGES;
 
-typedef NTSTATUS(NTAPI _ObReferenceObjectByName)(
+NTSTATUS NTAPI ObReferenceObjectByName(
 	PUNICODE_STRING ObjectPath,
 	ULONG Attributes,
 	PACCESS_STATE PassedAccessState OPTIONAL,
@@ -251,7 +253,7 @@ typedef NTSTATUS(NTAPI _ObReferenceObjectByName)(
 	PVOID ParseContext OPTIONAL,
 	PVOID* ObjectPtr);
 
-EXTERN_C __declspec(dllimport)
+// EXTERN_C __declspec(dllimport)
 NTSTATUS NTAPI MmCopyVirtualMemory
 (
 	PEPROCESS SourceProcess,

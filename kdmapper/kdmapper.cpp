@@ -76,7 +76,7 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 
 		// Write fixed image to kernel
 
-		if (!intel_driver::WriteMemory(iqvw64e_device_handle, realBase, (PVOID)((uintptr_t)local_image_base + TotalVirtualHeaderSize), image_size - TotalVirtualHeaderSize))
+		if (!intel_driver::WriteMemory(iqvw64e_device_handle, realBase, PVOID(uintptr_t(local_image_base) + TotalVirtualHeaderSize), image_size - TotalVirtualHeaderSize))
 		{
 			std::cout << "[-] Failed to write local image to remote image" << std::endl;
 			kernel_image_base = realBase;
@@ -96,6 +96,18 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 		if (!intel_driver::CallKernelFunction(iqvw64e_device_handle, &status, address_of_entry_point, realBase, image_size - TotalVirtualHeaderSize, kernelBase))
 		{
 			std::cout << "[-] Failed to call driver entry" << std::endl;
+			kernel_image_base = realBase;
+			break;
+		}
+
+		if (status == NTSTATUS(STATUS_INVALID_PARAMETER))
+		{
+			std::cout << "[-] DriverEntry reported invalid kernelBase" << std::endl;
+			kernel_image_base = realBase;
+			break;
+		} else if (!NT_SUCCESS(status))
+		{
+			std::cout << "[-] DriverEntry failed, check kernel logs for more info" << std::endl;
 			kernel_image_base = realBase;
 			break;
 		}

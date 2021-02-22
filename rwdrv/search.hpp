@@ -9,7 +9,7 @@ namespace Search {
 	extern PVOID CIBase;
 	extern ULONG CISize;
 
-	NTSTATUS SetKernelProps();
+	NTSTATUS SetKernelProps(PVOID kernelBase);
 	extern "C" PVOID ResolveRelativeAddress(
 		_In_ PVOID instruction,
 		_In_ const ULONG OffsetOffset,
