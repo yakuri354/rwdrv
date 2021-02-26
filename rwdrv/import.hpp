@@ -1,13 +1,40 @@
 #pragma once
 #include "common.hpp"
 
-#define C_FN(name) (LazyFn<decltype(name)>(skCrypt(#name)))
+#ifdef IMPORT_NO_CACHE
+#define C_FN(name) (LazyFn<decltype(name), hash_string(#name)>())
+#else
+#define C_FN(name) (LazyFnCached<decltype(name), hash_string(#name)>())
+#endif
 
-template <typename Fn>
+constexpr char inits[] = __TIME__;
+
+constexpr UINT32 seedBase = (inits[0] - '0') * 100000 + (inits[1] - '0') * 10000 + (inits[3] - '0') * 1000 + (inits[4] -
+	'0') * 100 + (inits[6] - '0') * 10 + inits[7] - '0';
+
+constexpr UINT32 hash_string(const char* s)
+{
+	UINT32 hash = 0;
+
+	for (; *s; ++s)
+	{
+		hash += *s;
+		hash += (hash << 10);
+		hash ^= (hash >> 6);
+	}
+
+	hash += (hash << 3);
+	hash ^= (hash >> 11);
+	hash += (hash << 15);
+
+	return hash;
+}
+
+template <typename Fn, UINT32 Hash>
 #ifndef DEBUG
 __forceinline
 #endif
-Fn* LazyFn(const char* name)
+Fn* LazyFn()
 {
 	auto* const peHeader = PIMAGE_DOS_HEADER(g::KernelBase);
 
@@ -23,7 +50,7 @@ Fn* LazyFn(const char* name)
 
 	for (unsigned i = 0; i < imageExportDirectory->AddressOfFunctions; i++)
 	{
-		if (!strcmp(name, PCHAR(g::KernelBase) + addressOfNames[i]))
+		if (hash_string(PCHAR(g::KernelBase) + addressOfNames[i]) == Hash)
 		{
 			return reinterpret_cast<Fn*>(UINT64(g::KernelBase) + address[ordinal[i]]);
 		}
@@ -31,3 +58,19 @@ Fn* LazyFn(const char* name)
 	return nullptr;
 }
 
+template <typename Fn, UINT32 Hash>
+#ifndef DEBUG
+__forceinline
+#endif
+Fn* LazyFnCached()
+{
+	static void* cache = nullptr;
+	
+	if (cache == nullptr) {
+		auto ptr = LazyFn<Fn, Hash>();
+		cache = PVOID(UINT64(ptr) ^ (UINT64(seedBase ^ Hash) << 32 | (seedBase ^ Hash) * 3));
+		return ptr;
+	}
+
+	return reinterpret_cast<Fn*>(UINT64(cache) ^ (UINT64(seedBase ^ Hash) << 32 | (seedBase ^ Hash) * 3));
+}

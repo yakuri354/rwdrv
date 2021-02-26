@@ -323,8 +323,8 @@ int main()
 		}
 	}
 
-	
-	const auto iqvw64e_device_handle = intel_driver::Load();
+
+	auto* const iqvw64e_device_handle = intel_driver::Load();
 	
 	if (!iqvw64e_device_handle || iqvw64e_device_handle == INVALID_HANDLE_VALUE)
 	{

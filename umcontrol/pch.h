@@ -9,5 +9,6 @@
 
 // Добавьте сюда заголовочные файлы для предварительной компиляции
 #include "framework.h"
+#include <winternl.h>
 
 #endif //PCH_H

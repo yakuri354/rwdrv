@@ -5,15 +5,16 @@
 #include <iostream>
 #include <Windows.h>
 #include "../loader/xorstr.hpp"
+#include "thread.hpp"
 
 #define log(...) {char cad[512]; sprintf_s(cad, __VA_ARGS__);  LI_FN(OutputDebugStringA)(cad);}
 
-typedef long NTSTATUS;
-
-constexpr bool NT_SUCCESS(NTSTATUS status)
-{
-	return status >= 0;
-}
+// typedef long NTSTATUS;
+//
+// constexpr bool NT_SUCCESS(NTSTATUS status)
+// {
+// 	return status >= 0;
+// }
 
 namespace g
 {
@@ -117,10 +118,6 @@ DWORD WINAPI RealMain(void* param)
 
 	log(xs("[umc] Retrieving hooked fn\n"));
 
-	// _DriverCtl = decltype(_DriverCtl)(GetProcAddress(mod, HOOKED_FN_NAME));
-	
-	// _DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, decltype(_DriverCtl)).get();
-
 	_DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn*).in(LI_MODULE(HOOKED_FN_MODULE).get());
 	
 	if (_DriverCtl == nullptr)
@@ -156,7 +153,8 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	if (ul_reason_for_call == DLL_PROCESS_ATTACH)
 	{
 		log(xs("[umc] Launching thread\n"));
-		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
+		// LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
+		SpoofThread(RealMain, hModule);
 	}
 
 	return TRUE;

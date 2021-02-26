@@ -12,9 +12,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "loader", "loader\loader.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rwdrv", "rwdrv\rwdrv.vcxproj", "{34374122-79AF-4128-A1D9-CE3B5F736E3C}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "umcontrol", "umcontrol\umcontrol.vcxproj", "{5C84D9BB-5188-4049-B7B3-D2D495325682}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "host", "umcontrol\umcontrol.vcxproj", "{5C84D9BB-5188-4049-B7B3-D2D495325682}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kdmapper", "kdmapper\kdmapper.vcxproj", "{518E0636-BA8F-459D-ACAC-81BD33475E3E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mapper", "kdmapper\kdmapper.vcxproj", "{518E0636-BA8F-459D-ACAC-81BD33475E3E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

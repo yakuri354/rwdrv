@@ -244,13 +244,13 @@ uint64_t intel_driver::AllocatePool(HANDLE device_handle, nt::POOL_TYPE pool_typ
 bool intel_driver::FreePool(HANDLE device_handle, uint64_t address)
 {
 	if (!address)
-		return 0;
+		return false;
 
 	static uint64_t kernel_ExFreePool = GetKernelModuleExport(device_handle, utils::GetKernelModuleAddress("ntoskrnl.exe"), "ExFreePool");
 
 	if (!kernel_ExFreePool) {
 		std::cout << "[!] Failed to find ExAllocatePool" << std::endl;
-		return 0;
+		return false;
 	}
 
 	return CallKernelFunction<void>(device_handle, nullptr, kernel_ExFreePool, address);

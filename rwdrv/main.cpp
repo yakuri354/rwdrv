@@ -6,6 +6,9 @@
 #include "util.hpp"
 #include "skcrypt.hpp"
 #include "comms.hpp"
+#include "intrin.h"
+
+// Nothing works :(
 
 PVOID g::KernelBase;
 
@@ -66,11 +69,11 @@ UINT __fastcall HookControl(UINT a1, UINT a2, UINT a3)
 			ptr.LowPart = a2;
 			ptr.HighPart = a3;
 
-			log(skCrypt("[rwdrv] Initializing; Setting shared memory Va to [%p]\n"), PVOID(ptr.QuadPart));
+			log(skCrypt("[rwdrv] Initializing; Shared memory at [%p]\n"), PVOID(ptr.QuadPart));
 
 			g::DriverState.SharedMemory = PVOID(ptr.QuadPart);
 
-			log(skCrypt("[rwdrv] Testing shmem Va "));
+			log(skCrypt("[rwdrv] CR3 [0x%p]"), __readcr3());
 
 			if (C_FN(MmIsAddressValid)(g::DriverState.SharedMemory))
 			{

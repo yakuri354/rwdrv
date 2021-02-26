@@ -472,7 +472,7 @@ namespace li {
                 if (!cached)
                     cached = Derived::template get<void*, Enum>();
 
-                return (T)(cached);
+                return T(cached);
             }
 
             template<class T = DefaultType>
@@ -490,7 +490,7 @@ namespace li {
                 Enum e;
                 do {
                     if (hash(e.value->BaseDllName) == Hash)
-                        return (T)(e.value->DllBase);
+                        return T(e.value->DllBase);
                 } while (e.next());
                 return {};
             }
@@ -498,10 +498,10 @@ namespace li {
             template<class T = void*, class Ldr>
             LAZY_IMPORTER_FORCEINLINE static T in(Ldr ldr) noexcept
             {
-                safe_module_enumerator e((const detail::win::LDR_DATA_TABLE_ENTRY_T*)(ldr));
+                safe_module_enumerator e(static_cast<const detail::win::LDR_DATA_TABLE_ENTRY_T*>(ldr));
                 do {
                     if (hash(e.value->BaseDllName) == Hash)
-                        return (T)(e.value->DllBase);
+                        return T(e.value->DllBase);
                 } while (e.next());
                 return {};
             }
