@@ -243,6 +243,9 @@ typedef struct _POOL_TRACKER_BIG_PAGES
 	ULONGLONG NumberOfBytes;                                                //0x10
 } POOL_TRACKER_BIG_PAGES, * PPOOL_TRACKER_BIG_PAGES;
 
+#ifdef DEBUG
+extern "C" __declspec(dllimport)
+#endif
 NTSTATUS NTAPI ObReferenceObjectByName(
 	PUNICODE_STRING ObjectPath,
 	ULONG Attributes,

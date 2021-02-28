@@ -54,10 +54,15 @@ namespace g
 
 PHookFn* _DriverCtl = nullptr;
 
-__forceinline unsigned DriverCtl(unsigned controlCode, unsigned additionalParam = NULL)
+__forceinline uint64_t DriverCall(uint64_t a1, uint16_t a2)
 {
-	return (*_DriverCtl)(CTL_MAGIC, controlCode, additionalParam);
-	// return unsigned(OpenInputDesktop(CTL_MAGIC, controlCode, additionalParam));
+	return (*_DriverCtl)(a1, a2);
+}
+
+
+__forceinline uint64_t DriverCtl(CTLTYPE controlCode)
+{
+	return DriverCall(CTL_MAGIC, controlCode);
 }
 
 struct State
@@ -75,13 +80,9 @@ bool InitDriver()
 {
 	log(xs("[umc] Initializing driver\n"));
 
-	LARGE_INTEGER va;
+	log(xs("[umc] Making init call, Va [%p]\n"), g::State.Memory);
 
-	va.QuadPart = INT64(g::State.Memory);
-
-	log(xs("[umc] Making init call, Va [%p]\n"), PVOID(va.QuadPart));
-
-	const auto status = DriverCtl(va.LowPart, va.HighPart);
+	const auto status = DriverCall(uint64_t(g::State.Memory), CTL_INIT_MAGIC);
 
 	if (!NT_SUCCESS(status))
 	{
@@ -89,7 +90,7 @@ bool InitDriver()
 		return false;
 	}
 
-	if (!(*static_cast<unsigned*>(g::State.Memory) == CTL_MAGIC))
+	if (!(*static_cast<uint32_t*>(g::State.Memory) == CTL_MAGIC))
 	{
 		log(xs("[umc] Probe write failed"));
 		return false;

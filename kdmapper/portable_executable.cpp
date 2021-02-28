@@ -1,5 +1,7 @@
 #include "portable_executable.hpp"
 
+#include <iostream>
+
 PIMAGE_NT_HEADERS64 portable_executable::GetNtHeaders(void* image_base)
 {
 	const auto dos_header = reinterpret_cast<PIMAGE_DOS_HEADER>(image_base);
@@ -51,12 +53,12 @@ portable_executable::vec_imports portable_executable::GetImports(void* image_bas
 {
 	const PIMAGE_NT_HEADERS64 nt_headers = GetNtHeaders(image_base);
 
-	if (!nt_headers)
+	if (!nt_headers || !nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress)
 		return {};
 
 	vec_imports imports;
 
-	auto current_import_descriptor = reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(reinterpret_cast<uint64_t>(image_base) + nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+	auto* current_import_descriptor = reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(reinterpret_cast<uint64_t>(image_base) + nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 
 	while (current_import_descriptor->FirstThunk)
 	{
@@ -64,8 +66,8 @@ portable_executable::vec_imports portable_executable::GetImports(void* image_bas
 
 		import_info.module_name = std::string(reinterpret_cast<char*>(reinterpret_cast<uint64_t>(image_base) + current_import_descriptor->Name));
 
-		auto current_first_thunk = reinterpret_cast<PIMAGE_THUNK_DATA64>(reinterpret_cast<uint64_t>(image_base) + current_import_descriptor->FirstThunk);
-		auto current_originalFirstThunk = reinterpret_cast<PIMAGE_THUNK_DATA64>(reinterpret_cast<uint64_t>(image_base) + current_import_descriptor->OriginalFirstThunk);
+		auto* current_first_thunk = reinterpret_cast<PIMAGE_THUNK_DATA64>(reinterpret_cast<uint64_t>(image_base) + current_import_descriptor->FirstThunk);
+		auto* current_originalFirstThunk = reinterpret_cast<PIMAGE_THUNK_DATA64>(reinterpret_cast<uint64_t>(image_base) + current_import_descriptor->OriginalFirstThunk);
 
 		while (current_originalFirstThunk->u1.Function)
 		{

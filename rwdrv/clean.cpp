@@ -101,27 +101,25 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 
 BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* poolBigPageTableSize) // FIXME
 {
-	const auto bptSize =
-		reinterpret_cast<PVOID>(FindPattern(
-				reinterpret_cast<UINT64>(KernelBase),
-				KernelSize,
-				reinterpret_cast<BYTE*>( // Pattern
-					static_cast<char*>(
-						skCrypt("\x4C\x8B\x15\x00\x00\x00\x00\x48\x85")
-					)),
-				skCrypt("xxx????xx"))
-		);
+	const auto bptSize = FindPattern(
+		reinterpret_cast<UINT64>(KernelBase),
+		KernelSize,
+		reinterpret_cast<BYTE*>( // Pattern
+			static_cast<char*>(
+				skCrypt("\x4C\x8B\x15\x00\x00\x00\x00\x48\x85")
+			)),
+		skCrypt("xxx????xx")
+	);
 
-	const auto bpt =
-		reinterpret_cast<PVOID>(FindPattern(
-			reinterpret_cast<UINT64>(KernelBase),
-			KernelSize,
-			reinterpret_cast<BYTE*>(
-				static_cast<char*>(
-					skCrypt("\x48\x8B\x15\x00\x00\x00\x00\x4C\x8D\x0D\x00\x00\x00\x00\x4C")
-				)),
-			skCrypt("xxx????xxx????x")
-		));
+	const auto bpt = FindPattern(
+		reinterpret_cast<UINT64>(KernelBase),
+		KernelSize,
+		reinterpret_cast<BYTE*>(
+			static_cast<char*>(
+				skCrypt("\x48\x8B\x15\x00\x00\x00\x00\x4C\x8D\x0D\x00\x00\x00\x00\x4C")
+			)),
+		skCrypt("xxx????xxx????x")
+	);
 
 	if (!bptSize || !bpt)
 	{
@@ -135,14 +133,14 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* pool
 
 bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
 {
-	const auto exProtectPoolExCallInstructionsAddress = PVOID(FindPattern(
+	const auto exProtectPoolExCallInstructionsAddress = FindPattern(
 		reinterpret_cast<UINT64>(KernelBase),
 		KernelSize,
 		reinterpret_cast<BYTE*>(static_cast<char*>((
 				skCrypt("\xE8\x00\x00\x00\x00\x83\x67\x0C\x00"))
 		)),
 		skCrypt("x????xxxx")
-	));
+	);
 
 	if (!exProtectPoolExCallInstructionsAddress)
 		return false;
@@ -152,11 +150,12 @@ bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPo
 	if (!exProtectPoolExAddress)
 		return false;
 
-	const auto poolBigPageTableInstructionAddress = PVOID(ULONG64(exProtectPoolExAddress) + 0x95);
-	*pPoolBigPageTable = reinterpret_cast<PPOOL_TRACKER_BIG_PAGES>(
-		ResolveRelativeAddress(poolBigPageTableInstructionAddress, 3, 7));
+	const auto poolBigPageTableInstructionAddress = UINT64(exProtectPoolExAddress) + 0x95;
+	*pPoolBigPageTable = PPOOL_TRACKER_BIG_PAGES(
+		ResolveRelativeAddress(poolBigPageTableInstructionAddress, 3, 7)
+	);
 
-	const auto poolBigPageTableSizeInstructionAddress = PVOID(ULONG64(exProtectPoolExAddress) + 0x8E);
+	const auto poolBigPageTableSizeInstructionAddress = UINT64(exProtectPoolExAddress) + 0x8E;
 	*pPoolBigPageTableSize = *static_cast<SIZE_T*>(
 		ResolveRelativeAddress(poolBigPageTableSizeInstructionAddress, 3, 7));
 

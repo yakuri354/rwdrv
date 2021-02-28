@@ -1,10 +1,13 @@
 #pragma once
 #include "common.hpp"
-
+#ifdef DEBUG
+#define C_FN(name) name
+#else
 #ifdef IMPORT_NO_CACHE
 #define C_FN(name) (LazyFn<decltype(name), hash_string(#name)>())
 #else
 #define C_FN(name) (LazyFnCached<decltype(name), hash_string(#name)>())
+#endif
 #endif
 
 constexpr char inits[] = __TIME__;
@@ -68,9 +71,11 @@ Fn* LazyFnCached()
 	
 	if (cache == nullptr) {
 		auto ptr = LazyFn<Fn, Hash>();
-		cache = PVOID(UINT64(ptr) ^ (UINT64(seedBase ^ Hash) << 32 | (seedBase ^ Hash) * 3));
+		// cache = PVOID(UINT64(ptr) ^ (UINT64(seedBase ^ Hash) << 32 | (seedBase ^ Hash) * 3));
+		cache = PVOID(UINT64(ptr) ^ seedBase);
 		return ptr;
 	}
 
-	return reinterpret_cast<Fn*>(UINT64(cache) ^ (UINT64(seedBase ^ Hash) << 32 | (seedBase ^ Hash) * 3));
+	// return reinterpret_cast<Fn*>(UINT64(cache) ^ (UINT64(seedBase ^ Hash) << 32 | (seedBase ^ Hash) * 3));
+	return reinterpret_cast<Fn*>(UINT64(cache) ^ seedBase);
 }

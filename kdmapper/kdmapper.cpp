@@ -67,20 +67,16 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 
 		RelocateImageByDelta(portable_executable::GetRelocs(local_image_base), kernel_image_base - nt_headers->OptionalHeader.ImageBase);
 
-		// std::cout << "relocated" << std::endl;
-		//
-		// const auto imports = portable_executable::GetImports(local_image_base);
-		//
-		// std::cout << "got imports" << std::endl;
-		//
-		// if (!imports.empty() && !ResolveImports(iqvw64e_device_handle, imports))
-		// {
-		// 	std::cout << "[-] Failed to resolve imports" << std::endl;
-		// 	kernel_image_base = realBase;
-		// 	break;
-		// }
-
-		// std::cout << "writing" << std::endl;
+#ifdef DEBUG
+		const auto imports = portable_executable::GetImports(local_image_base);
+		
+		if (!imports.empty() && !ResolveImports(iqvw64e_device_handle, imports))
+		{
+			std::cout << "[-] Failed to resolve imports" << std::endl;
+			kernel_image_base = realBase;
+			break;
+		}
+#endif
 
 		// Write fixed image to kernel
 
@@ -102,6 +98,8 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 		NTSTATUS status = 0;
 
 		const auto kernelBase = utils::GetKernelModuleAddress("ntoskrnl.exe");
+
+		system("pause");
 
 		if (!intel_driver::CallKernelFunction(iqvw64e_device_handle, &status, address_of_entry_point, realBase, image_size - TotalVirtualHeaderSize, kernelBase))
 		{

@@ -1,12 +1,16 @@
 #pragma once
-#define CTLCODE constexpr unsigned
 
-#define HOOKED_FN_NAME "OpenInputDesktop"
+typedef unsigned short CTLTYPE;
+#define CTLCODE constexpr CTLTYPE
+
+#define HOOKED_FN_NAME "FindThreadPointerData"
 #define HOOKED_FN_MODULE "User32.dll"
 
-CTLCODE CTL_MAGIC = 0xDEADBEEF;
+constexpr UINT64 CTL_MAGIC = 0xDEADBEEFFEEBDAED;
+CTLCODE CTL_INIT_MAGIC = 'I';
 
-typedef UINT(*PHookFn)(UINT, UINT, UINT);
+typedef UINT64(__fastcall *PHookFn)(UINT64 a1, UINT16 a2);
+typedef UINT64(__fastcall* _WmiTraceMessage)(UINT64, UINT64, UINT64, UINT64, UINT64, UINT64, UINT64);
 
 constexpr size_t SHMEM_SIZE = 1024 * 4;
 

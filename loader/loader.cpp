@@ -248,7 +248,7 @@ bool InjectDll()
 }
 
 
-int main()
+int load()
 {
 	std::cout << xs("[>] Loading rwdrv") << std::endl;
 
@@ -358,10 +358,17 @@ int main()
 
 	std::cout << xs("[+] Loader finished successfully; exiting") << std::endl;
 
+	return 0;
+}
+
+int main()
+{
+	const auto result = load();
+
 	if (GetConsoleProcessList(nullptr, 0) == 1)
 	{
 		system("pause");
 	}
 
-	return 0;
+	return result;
 }
