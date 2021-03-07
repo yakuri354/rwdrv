@@ -126,8 +126,8 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* pool
 		return false;
 	}
 
-	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES>(ResolveRelativeAddress(bpt, 3, 7));
-	*poolBigPageTableSize = *static_cast<PSIZE_T>(ResolveRelativeAddress(bptSize, 3, 7));
+	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES>(ResolveRelativeAddress(bpt, 3));
+	*poolBigPageTableSize = *static_cast<PSIZE_T>(ResolveRelativeAddress(bptSize, 3));
 	return true;
 }
 
@@ -145,19 +145,19 @@ bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPo
 	if (!exProtectPoolExCallInstructionsAddress)
 		return false;
 
-	auto exProtectPoolExAddress = ResolveRelativeAddress(exProtectPoolExCallInstructionsAddress, 1, 5);
+	auto exProtectPoolExAddress = ResolveRelativeAddress(exProtectPoolExCallInstructionsAddress, 1);
 
 	if (!exProtectPoolExAddress)
 		return false;
 
 	const auto poolBigPageTableInstructionAddress = UINT64(exProtectPoolExAddress) + 0x95;
 	*pPoolBigPageTable = PPOOL_TRACKER_BIG_PAGES(
-		ResolveRelativeAddress(poolBigPageTableInstructionAddress, 3, 7)
+		ResolveRelativeAddress(poolBigPageTableInstructionAddress, 3)
 	);
 
 	const auto poolBigPageTableSizeInstructionAddress = UINT64(exProtectPoolExAddress) + 0x8E;
 	*pPoolBigPageTableSize = *static_cast<SIZE_T*>(
-		ResolveRelativeAddress(poolBigPageTableSizeInstructionAddress, 3, 7));
+		ResolveRelativeAddress(poolBigPageTableSizeInstructionAddress, 3));
 
 	return true;
 }

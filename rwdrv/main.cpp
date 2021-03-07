@@ -8,6 +8,7 @@
 #include "comms.hpp"
 #include "intrin.h"
 
+
 PVOID g::KernelBase;
 
 struct _DriverState
@@ -49,35 +50,36 @@ inline NTSTATUS CleanupMiscTraces()
 	return STATUS_SUCCESS;
 }
 
-UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64 a5)
+UINT64 __fastcall HookControl(UINT64 ctlCode, UINT64 a2, UINT64 param, UINT16 magic, UINT64 a5) // TODO Move init logic to another function or file
 {
-	log(skCrypt("[rwdrv] Hook called!, args [0x%p] [0x%p] [0x%p] [%C] [0x%p]\n"), PVOID(a1), PVOID(a2), PVOID(a3), a4, PVOID(a5));
+	// log(skCrypt("[rwdrv] Hook called!, args [0x%p] [0x%p] [0x%p] [0x%xs] [0x%p]\n"), PVOID(ctlCode), PVOID(a2), PVOID(param), magic, PVOID(a5));
 
-	if (unsigned(a1 >> 32) == CTL_MAGIC)
-	{
-		log(skCrypt("[rwdrv] Ctl called, code [%x]\n"), UINT32(a4));
-		// TODO Control codes
-		// TODO Shared memory
-		return STATUS_SUCCESS;
-	}
+	__debugbreak();
 	
-	if (!g::DriverState.Initialized)
+	if (!g::DriverState.Initialized && magic == CTL_MAGIC)
 	{	
-		log(skCrypt("[rwdrv] Initializing; Shared memory at [%p]\n"), PVOID(a1));
+		LARGE_INTEGER lint;
+		lint.LowPart = UINT32(ctlCode);
+		lint.HighPart = UINT32(param);
 
-		g::DriverState.SharedMemory = PVOID(a1);
-
+		log(skCrypt("[rwdrv] Initializing; Shared memory at [%p]\n"), PVOID(lint.QuadPart));
+		
 		log(skCrypt("[rwdrv] CR3 [0x%p]\n"), __readcr3());
 
-		if (C_FN(MmIsAddressValid)(g::DriverState.SharedMemory))
+		__debugbreak();
+
+		if (C_FN(MmIsAddressValid)(PVOID(lint.QuadPart)))
 		{
-			*PUINT32(g::DriverState.SharedMemory) = CTL_MAGIC;
+			*PUINT16(g::DriverState.SharedMemory) = CTL_MAGIC;
 		}
 		else
 		{
 			log(skCrypt("[rwdrv] Bad shared memory Va\n"));
+			return CTL_GENERIC_ERROR; // TODO Specific status
 		}
-
+		
+		g::DriverState.SharedMemory = PVOID(lint.QuadPart);
+		
 		log(skCrypt("[rwdrv] Cleaning up traces\n"));
 
 		const auto status = CleanupMiscTraces();
@@ -85,24 +87,31 @@ UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64
 		if (!NT_SUCCESS(status))
 		{
 			log(skCrypt("[rwdrv] Cleaning traces failed, aborting\n"));
-			return status;
+			return CTL_GENERIC_ERROR; // TODO Specific status
 		}
 		
 		log(skCrypt("[rwdrv] Driver successfully initialized\n"));
 		g::DriverState.Initialized = true;
-		return STATUS_SUCCESS;
+		
+		return CTL_SUCCESS;
 	}
 
-	if (a1 >= 0xffff000000000000 && UINT64(Search::RtBase) <= a5 && a5 <= (UINT64(Search::RtBase) + 0x111000)) // TODO hardcoded offsets
+	if (UINT16(magic) == CTL_MAGIC)
+	{
+		log(skCrypt("[rwdrv] Ctl called, code [%x]\n"), UINT32(ctlCode));
+		// TODO Control codes
+		// TODO Shared memory
+		return CTL_SUCCESS;
+	}
+
+	if (magic > 1) // TODO More precise ways to detect Wmi call
 	{
 		log(skCrypt("[rwdrv] Restoring Wmi call\n"));
-		return _WmiTraceMessage(g::DriverState.OriginalWmiFn)(a1, a2, a3, a4, a5);
+		return _WmiTraceMessage(g::DriverState.OriginalWmiFn)(ctlCode, a2, param, magic, a5);
 	}
-
-	// DbgBreakPoint();
 	
-	// log(skCrypt("[rwdrv] Restoring syscall: [0x%p] [0x%x]\n"), PVOID(a1), UINT32(a4));
-	return PHookFn(g::DriverState.OriginalSyscallFn)(a1);
+	log(skCrypt("[rwdrv] Restoring syscall: [0x%p] [0x%x]\n"), PVOID(ctlCode), UINT32(magic));
+	return PHookFn(g::DriverState.OriginalSyscallFn)(UINT32(ctlCode), magic, UINT32(param));
 }
 
 
@@ -110,11 +119,11 @@ NTSTATUS SetupHook()
 {
 	// The outside function, first in the chain
 	// __int64 __fastcall ApiSetEditionOpenInputDesktopEntryPoint(unsigned int a1, unsigned int a2, unsigned int a3)
-	const auto syscall = Search::FindPattern(
+	auto syscall = Search::FindPattern(
 		UINT64(Search::Win32kBase),
 		Search::Win32kSize,
-		PUCHAR(PCHAR(skCrypt("\x8B\xCD\xFF\x15\x00\x00\x00\x00\x48\x8B\xD8"))),
-		skCrypt("xxxx????xxx")
+		PUCHAR(PCHAR(skCrypt("\x0F\x85\x00\x00\x00\x00\x48\x8B\x05\x00\x00\x00\x00\x49\x8B\xDE"))),
+		skCrypt("xx????xxx????xxx")
 	);
 
 	if (syscall == NULL)
@@ -123,7 +132,9 @@ NTSTATUS SetupHook()
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	auto* const syscallDataPtr = Search::ResolveRelativeAddress(syscall, 3, 7);
+	syscall += 6; // Skip opcode due to sig
+	
+	auto* const syscallDataPtr = Search::ResolveRelativeAddress(syscall, 3);
 
 	log(skCrypt("[rwdrv] Syscall pointer location at [0x%p]\n"), PVOID(syscallDataPtr));
 
@@ -147,7 +158,7 @@ NTSTATUS SetupHook()
 	g::DriverState.OriginalSyscallFn =
 		InterlockedExchangePointer(
 			static_cast<PVOID volatile*>(syscallDataPtr),
-			Search::ResolveRelativeAddress(rtLogFn, 1, 5)
+			Search::ResolveRelativeAddress(rtLogFn, 1)
 		);
 
 	g::DriverState.OriginalWmiFn =

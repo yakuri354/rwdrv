@@ -111,20 +111,19 @@ NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 
 PVOID Search::ResolveRelativeAddress(
 	_In_ UINT64 instruction,
-	_In_ const ULONG OffsetOffset,
-	_In_ ULONG instructionSize
+	_In_ const ULONG offset
 )
 {
-	const auto ripOffset = *PLONG(instruction + OffsetOffset);
-	auto* const resolvedAddress = PVOID(instruction + instructionSize + ripOffset);
+	const auto ripOffset = *PLONG(instruction + offset);
+	auto* const resolvedAddress = PVOID(instruction + offset + 4 + ripOffset);
 
 	return resolvedAddress;
 }
 
 PVOID Search::ResolveEnclosingSig(UINT64 callAddress, UINT movOffset)
 {
-	const auto targetFn = UINT64(Search::ResolveRelativeAddress(callAddress, 1, 5));
-	return Search::ResolveRelativeAddress(targetFn + movOffset, 3, 7);
+	const auto targetFn = UINT64(Search::ResolveRelativeAddress(callAddress, 1));
+	return Search::ResolveRelativeAddress(targetFn + movOffset, 3);
 }
 
 

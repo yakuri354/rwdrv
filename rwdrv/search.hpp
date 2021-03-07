@@ -12,8 +12,7 @@ namespace Search {
 	NTSTATUS SetKernelProps(PVOID kernelBase);
 	PVOID ResolveRelativeAddress(
 		_In_ UINT64 instruction,
-		_In_ const ULONG OffsetOffset,
-		_In_ ULONG instructionSize
+		_In_ const ULONG offset
 	);
 
 	PVOID ResolveEnclosingSig(

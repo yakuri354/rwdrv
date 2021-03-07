@@ -9,62 +9,19 @@
 
 #define log(...) {char cad[512]; sprintf_s(cad, __VA_ARGS__);  LI_FN(OutputDebugStringA)(cad);}
 
-// typedef long NTSTATUS;
-//
-// constexpr bool NT_SUCCESS(NTSTATUS status)
-// {
-// 	return status >= 0;
-// }
+#define CTL_IS_ERROR(status) ((status) != CTL_SUCCESS && (status) >= CTL_GENERIC_ERROR)
 
-namespace g
+PHookFn _DriverCtl = nullptr;
+
+__forceinline uint64_t DriverCall(uint32_t a1, uint16_t a2, uint32_t a3)
 {
-	FILE* ConOut{};
-};
-
-// template <typename A>
-// __forceinline void log(const char *fmt, A args...)
-// {
-// #ifdef DEBUG
-// 	if (g::ConOut == nullptr)
-// 	{
-//         AllocConsole();
-//         freopen_s(&g::ConOut, "CONIN$", "r", stdin);
-//         freopen_s(&g::ConOut, "CONOUT$", "w", stderr);
-//         freopen_s(&g::ConOut, "CONOUT$", "w", stdout);
-// 	}
-//     printf(fmt, args);
-//     printf("\n");
-// #endif
-// }
-
-// __forceinline void log(const char* fmt)
-// {
-// #ifdef DEBUG
-//     if (g::ConOut == nullptr)
-//     {
-//         AllocConsole();
-//         freopen_s(&g::ConOut, "CONIN$", "r", stdin);
-//         freopen_s(&g::ConOut, "CONOUT$", "w", stderr);
-//         freopen_s(&g::ConOut, "CONOUT$", "w", stdout);
-//     }
-//     printf(fmt);
-//     printf("\n");
-// #endif
-// }
-//
-// TODO Rework shit
-
-PHookFn* _DriverCtl = nullptr;
-
-__forceinline uint64_t DriverCall(uint64_t a1)
-{
-	return (*_DriverCtl)(a1);
+	return _DriverCtl(a1, a2, a3);
 }
 
 
-__forceinline uint64_t DriverCtl(CTLTYPE controlCode)
+__forceinline uint64_t DriverCtl(CTLTYPE controlCode, uint32_t additionalParam = 0)
 {
-	return DriverCall(UINT64(CTL_MAGIC) << 32 | UINT64(controlCode));
+	return DriverCall(controlCode, CTL_MAGIC, additionalParam);
 }
 
 struct State
@@ -84,17 +41,33 @@ bool InitDriver()
 
 	log(xs("[umc] Making init call, Va [%p]\n"), g::State.Memory);
 
-	const auto status = DriverCall(uint64_t(g::State.Memory));
+	LARGE_INTEGER lint;
 
-	if (!NT_SUCCESS(status))
+	lint.QuadPart = int64_t(g::State.Memory);
+
+	Sleep(3000);
+
+	log("a1 -> 0x%x\n", lint.LowPart)
+	log("a2 -> 0x%xs\n", CTL_MAGIC)
+	log("a3 -> 0x%x\n", lint.HighPart)
+
+	const auto status = DriverCall(lint.LowPart, CTL_MAGIC, lint.HighPart);
+
+	if (CTL_IS_ERROR(status))
 	{
-		log(xs("[umc] Init call failed with status %llu\n"), status);
+		log(xs("[umc] Init call failed with status 0x%llx\n"), status);
 		return false;
 	}
 
-	if (!(*static_cast<uint32_t*>(g::State.Memory) == CTL_MAGIC))
+	if (!status)
 	{
-		log(xs("[umc] Probe write failed"));
+		log(xs("[umc] Init call returned null handle. Looks like the hook does not work, check kernel logs\n"));
+		return false;
+	}
+
+	if (*static_cast<uint16_t*>(g::State.Memory) != CTL_MAGIC)
+	{
+		log(xs("[umc] Probe write failed\n"));
 		return false;
 	}
 
@@ -121,17 +94,30 @@ DWORD WINAPI RealMain(void* param)
 
 	log(xs("[umc] Retrieving hooked fn\n"));
 
-	// _DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn*).in(LI_MODULE(HOOKED_FN_MODULE).get());
+	auto* dll = LI_MODULE(HOOKED_FN_MODULE).safe();
 
-	__debugbreak();
+	if (dll == nullptr)
+	{
+		log(xs("[umc] Module %s not loaded, attempting to load it\n"), xs(HOOKED_FN_MODULE));
+
+		dll = LI_FN(LoadLibraryA)(xs(HOOKED_FN_MODULE));
+
+		if (dll == nullptr || dll == INVALID_HANDLE_VALUE)
+		{
+			log(xs("[umc] Could not load module, aborting\n"));
+			return false;
+		}
+	}
+
+	_DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
 
 	if (_DriverCtl == nullptr)
 	{
-		log(xs("[umc] Could not find function %s\n"), "FindThreadPointerData");
+		log(xs("[umc] Could not find function %s\n"), xs(HOOKED_FN_NAME));
 		return -1;
 	}
 
-	log(xs("[umc] Found hooked fn %s at [0x%p]\n"), "FindThreadPointerData", PVOID(_DriverCtl));
+	log(xs("[umc] Found hooked fn %s at [0x%p]\n"), xs(HOOKED_FN_NAME), PVOID(_DriverCtl));
 
 	if (!InitDriver())
 	{

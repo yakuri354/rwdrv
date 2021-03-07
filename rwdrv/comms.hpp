@@ -1,28 +1,34 @@
 #pragma once
 
-typedef unsigned short CTLTYPE;
+typedef unsigned CTLTYPE;
 #define CTLCODE constexpr CTLTYPE
+#define CTLSTATUS(st, val) constexpr unsigned __int64 CTL_##st = 0xFFFEFFFF##val;
 
 #define HOOKED_FN_NAME "OpenInputDesktop"
 #define HOOKED_FN_MODULE "User32.dll"
 
-constexpr UINT32 CTL_MAGIC = 0xDEADBEEF;;
+constexpr UINT16 CTL_MAGIC = 0xFFAB;
 
-typedef UINT64(__fastcall *PHookFn)(UINT32, UINT16, UINT32);
-typedef UINT64(__fastcall *_WmiTraceMessage)(UINT64, UINT64, UINT64, UINT64, UINT64);
+typedef UINT64 (__fastcall *PHookFn)(UINT32, UINT16, UINT32);
+typedef UINT64 (__fastcall *_WmiTraceMessage)(UINT64, UINT64, UINT64, UINT64, UINT64);
 
 constexpr size_t SHMEM_SIZE = 1024 * 4;
 
 namespace Ctl
 {
-	CTLCODE PING			 = 0x01;
-	CTLCODE INIT			 = 0x10;
-	CTLCODE SET_TARGET		 = 0x20;
-	CTLCODE READ_TARGET_MEM  = 0x30;
-	CTLCODE READ_PHYS_MEM	 = 0x31;
+	CTLCODE PING = 0x01;
+	CTLCODE INIT = 0x10;
+	CTLCODE SET_TARGET = 0x20;
+	CTLCODE READ_TARGET_MEM = 0x30;
+	CTLCODE READ_PHYS_MEM = 0x31;
 	CTLCODE WRITE_TARGET_MEM = 0x40;
-	CTLCODE WRITE_PHYS_MEM	 = 0x41;
+	CTLCODE WRITE_PHYS_MEM = 0x41;
 }
+
+
+CTLSTATUS(SUCCESS, FFFFFFFF)
+CTLSTATUS(GENERIC_ERROR, 00000001)
+
 
 struct GenericReadWrite
 {
