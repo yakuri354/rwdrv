@@ -186,7 +186,7 @@ bool InjectDll()
 
 	const auto realDllPath = temp / dllName;
 
-	copy(std::filesystem::path(ExePath()) / xs("umcontrol.dll"), realDllPath);
+	copy(std::filesystem::path(ExePath()) / xs("host.dll"), realDllPath);
 
 
 	const auto memory = VirtualAllocEx(hProc, nullptr,

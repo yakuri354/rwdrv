@@ -51,18 +51,20 @@ namespace g
 //     printf("\n");
 // #endif
 // }
+//
+// TODO Rework shit
 
 PHookFn* _DriverCtl = nullptr;
 
-__forceinline uint64_t DriverCall(uint64_t a1, uint16_t a2)
+__forceinline uint64_t DriverCall(uint64_t a1)
 {
-	return (*_DriverCtl)(a1, a2);
+	return (*_DriverCtl)(a1);
 }
 
 
 __forceinline uint64_t DriverCtl(CTLTYPE controlCode)
 {
-	return DriverCall(CTL_MAGIC, controlCode);
+	return DriverCall(UINT64(CTL_MAGIC) << 32 | UINT64(controlCode));
 }
 
 struct State
@@ -82,11 +84,11 @@ bool InitDriver()
 
 	log(xs("[umc] Making init call, Va [%p]\n"), g::State.Memory);
 
-	const auto status = DriverCall(uint64_t(g::State.Memory), CTL_INIT_MAGIC);
+	const auto status = DriverCall(uint64_t(g::State.Memory));
 
 	if (!NT_SUCCESS(status))
 	{
-		log(xs("[umc] Init call failed with status %x\n"), status);
+		log(xs("[umc] Init call failed with status %llu\n"), status);
 		return false;
 	}
 
@@ -119,17 +121,19 @@ DWORD WINAPI RealMain(void* param)
 
 	log(xs("[umc] Retrieving hooked fn\n"));
 
-	_DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn*).in(LI_MODULE(HOOKED_FN_MODULE).get());
-	
+	// _DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn*).in(LI_MODULE(HOOKED_FN_MODULE).get());
+
+	__debugbreak();
+
 	if (_DriverCtl == nullptr)
 	{
-		log(xs("[umc] Could not find function %s\n"), xs(HOOKED_FN_NAME));
+		log(xs("[umc] Could not find function %s\n"), "FindThreadPointerData");
 		return -1;
 	}
 
-	log(xs("[umc] Found hooked fn %s at %p\n"), xs(HOOKED_FN_NAME), PVOID(_DriverCtl));
+	log(xs("[umc] Found hooked fn %s at [0x%p]\n"), "FindThreadPointerData", PVOID(_DriverCtl));
 
-	if (!_DriverCtl || !InitDriver())
+	if (!InitDriver())
 	{
 		log(xs("[umc] Driver initialization failed\n"));
 		return -1;
@@ -149,13 +153,13 @@ BOOL APIENTRY DllMain(HMODULE hModule,
                       LPVOID lpReserved
 )
 {
-	log(xs("[umc] DllMain called\n"));
+	// log(xs("[umc] DllMain called\n"));
 
 	if (ul_reason_for_call == DLL_PROCESS_ATTACH)
 	{
 		log(xs("[umc] Launching thread\n"));
-		// LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
-		SpoofThread(RealMain, hModule);
+		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
+		// SpoofThread(RealMain, hModule);
 	}
 
 	return TRUE;

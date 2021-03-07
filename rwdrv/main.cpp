@@ -26,7 +26,7 @@ namespace g
 	::_DriverState DriverState{};
 }
 
-NTSTATUS CleanupMiscTraces()
+inline NTSTATUS CleanupMiscTraces()
 {
 	auto status = Clear::SpoofDiskSerials(Search::KernelBase, &g::DriverState.OriginalDiskDispatchFn);
 	if (!NT_SUCCESS(status))
@@ -49,77 +49,89 @@ NTSTATUS CleanupMiscTraces()
 	return STATUS_SUCCESS;
 }
 
-UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64 a5, UINT64 a6, UINT64 a7)
+UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64 a5)
 {
-	// log(skCrypt("[rwdrv] Hook called!, args [0x%p] [0x%p] [0x%p] [%C] [0x%p] [0x%p] [0x%p]\n"), PVOID(a1), PVOID(a2), PVOID(a3), a4, PVOID(a5), PVOID(a6), PVOID(a7));
+	log(skCrypt("[rwdrv] Hook called!, args [0x%p] [0x%p] [0x%p] [%C] [0x%p]\n"), PVOID(a1), PVOID(a2), PVOID(a3), a4, PVOID(a5));
 
-	if (a1 == CTL_MAGIC)
+	if (unsigned(a1 >> 32) == CTL_MAGIC)
 	{
-		log(skCrypt("[rwdrv] Ctl called, code [%x]"), UINT32(a4));
+		log(skCrypt("[rwdrv] Ctl called, code [%x]\n"), UINT32(a4));
 		// TODO Control codes
 		// TODO Shared memory
 		return STATUS_SUCCESS;
 	}
 	
-	if (!g::DriverState.Initialized && a4 == CTL_INIT_MAGIC)
-	{
-
+	if (!g::DriverState.Initialized)
+	{	
 		log(skCrypt("[rwdrv] Initializing; Shared memory at [%p]\n"), PVOID(a1));
 
 		g::DriverState.SharedMemory = PVOID(a1);
 
-		log(skCrypt("[rwdrv] CR3 [0x%p]"), __readcr3());
+		log(skCrypt("[rwdrv] CR3 [0x%p]\n"), __readcr3());
 
 		if (C_FN(MmIsAddressValid)(g::DriverState.SharedMemory))
 		{
-			*PUINT64(g::DriverState.SharedMemory) = CTL_MAGIC;
+			*PUINT32(g::DriverState.SharedMemory) = CTL_MAGIC;
 		}
 		else
 		{
 			log(skCrypt("[rwdrv] Bad shared memory Va\n"));
 		}
 
-		log(skCrypt("[rwdrv] Cleaning up traces"));
+		log(skCrypt("[rwdrv] Cleaning up traces\n"));
 
-		return CleanupMiscTraces();
+		const auto status = CleanupMiscTraces();
+		
+		if (!NT_SUCCESS(status))
+		{
+			log(skCrypt("[rwdrv] Cleaning traces failed, aborting\n"));
+			return status;
+		}
+		
+		log(skCrypt("[rwdrv] Driver successfully initialized\n"));
+		g::DriverState.Initialized = true;
+		return STATUS_SUCCESS;
 	}
 
-	if (a2 == 43 && a6 == 4 && a7 == 0)
+	if (a1 >= 0xffff000000000000 && UINT64(Search::RtBase) <= a5 && a5 <= (UINT64(Search::RtBase) + 0x111000)) // TODO hardcoded offsets
 	{
-		log(skCrypt("Restoring Wmi call"));
-		return _WmiTraceMessage(g::DriverState.OriginalWmiFn)(a1, a2, a3, a4, a5, a6, a7);
+		log(skCrypt("[rwdrv] Restoring Wmi call\n"));
+		return _WmiTraceMessage(g::DriverState.OriginalWmiFn)(a1, a2, a3, a4, a5);
 	}
-	log(skCrypt("Restoring syscall: [0x%p] [0x%x]"), PVOID(a1), UINT32(a4));
-	return PHookFn(g::DriverState.OriginalSyscallFn)(a1, a4);
+
+	// DbgBreakPoint();
+	
+	// log(skCrypt("[rwdrv] Restoring syscall: [0x%p] [0x%x]\n"), PVOID(a1), UINT32(a4));
+	return PHookFn(g::DriverState.OriginalSyscallFn)(a1);
 }
 
 
 NTSTATUS SetupHook()
 {
 	// The outside function, first in the chain
-	// __int64 __fastcall ApiSetEditionFindThreadPointerData(__int64 a1, unsigned __int16 a2)
-	const auto enclosingFn = Search::FindPattern(
+	// __int64 __fastcall ApiSetEditionOpenInputDesktopEntryPoint(unsigned int a1, unsigned int a2, unsigned int a3)
+	const auto syscall = Search::FindPattern(
 		UINT64(Search::Win32kBase),
 		Search::Win32kSize,
-		PUCHAR(PCHAR(skCrypt("\xE8\x00\x00\x00\x00\x45\x33\xD2\x48\x8B\xD8"))),
-		skCrypt("x????xxxxxx")
+		PUCHAR(PCHAR(skCrypt("\x8B\xCD\xFF\x15\x00\x00\x00\x00\x48\x8B\xD8"))),
+		skCrypt("xxxx????xxx")
 	);
 
-	if (enclosingFn == NULL)
+	if (syscall == NULL)
 	{
 		log(skCrypt("[rwdrv] Failed to locate syscall\n"));
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	auto* const syscallDataPtr = Search::ResolveEnclosingSig(enclosingFn, 0x7D);
+	auto* const syscallDataPtr = Search::ResolveRelativeAddress(syscall, 3, 7);
 
 	log(skCrypt("[rwdrv] Syscall pointer location at [0x%p]\n"), PVOID(syscallDataPtr));
 
 	const auto rtLogFn = Search::FindPattern(
 		UINT64(Search::RtBase),
 		Search::RtSize,
-		PUCHAR(PCHAR(skCrypt("\xE8\x00\x00\x00\x00\x85\xDB"))),
-		skCrypt("x????xx")
+		PUCHAR(PCHAR(skCrypt("\xE8\x00\x00\x00\x00\x4C\x8D\x5C\x24\x70\x8B\xC3"))),
+		skCrypt("x????xxxxxxx")
 	);
 
 	if (rtLogFn == NULL)
@@ -127,15 +139,15 @@ NTSTATUS SetupHook()
 		log(skCrypt("[rwdrv] Failed to locate realtek log function\n"));
 		return STATUS_UNSUCCESSFUL;
 	}
-	DbgBreakPoint();
-	auto* const rtDataPtr = Search::ResolveEnclosingSig(rtLogFn, 0x14);
+	
+	auto* const rtDataPtr = Search::ResolveEnclosingSig(rtLogFn, 0x18);
 
 	log(skCrypt("[rwdrv] Realtek pointer location at [0x%p]\n"), PVOID(rtDataPtr));
 	
 	g::DriverState.OriginalSyscallFn =
 		InterlockedExchangePointer(
 			static_cast<PVOID volatile*>(syscallDataPtr),
-			PVOID(rtDataPtr)
+			Search::ResolveRelativeAddress(rtLogFn, 1, 5)
 		);
 
 	g::DriverState.OriginalWmiFn =
