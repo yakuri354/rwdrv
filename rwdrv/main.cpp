@@ -35,11 +35,13 @@ inline NTSTATUS CleanupMiscTraces()
 		log(skCrypt("[rwdrv] Spoofing disk serials failed\n"));
 		return status;
 	}
-	status = Clear::ClearSystemBigPoolInfo(g::DriverState.BaseAddress);
-	if (!NT_SUCCESS(status))
-	{
-		log(skCrypt("[rwdrv] Clearing BigPoolInfo failed\n"));
-		return status;
+	if (g::DriverState.ImageSize >= 0x1000) {
+		status = Clear::ClearSystemBigPoolInfo(g::DriverState.BaseAddress);
+		if (!NT_SUCCESS(status))
+		{
+			log(skCrypt("[rwdrv] Clearing BigPoolInfo failed\n"));
+			return status;
+		}
 	}
 	status = Clear::ClearPfnEntry(g::DriverState.BaseAddress, g::DriverState.ImageSize);
 	if (!NT_SUCCESS(status))
@@ -107,7 +109,7 @@ UINT64 __fastcall HookControl(UINT64 ctlCode, UINT64 a2, UINT64 param, UINT16 ma
 		return _WmiTraceMessage(g::DriverState.OriginalWmiFn)(ctlCode, a2, param, magic, a5);
 	}
 	
-	log(skCrypt("[rwdrv] Restoring syscall: [0x%p] [0x%x]\n"), PVOID(ctlCode), UINT32(magic));
+	log(skCrypt("[rwdrv] Restoring syscall: [0x%x] [%u] [0x%x]\n"), PVOID(ctlCode), UINT32(magic), UINT32(param));
 	return PHookFn(g::DriverState.OriginalSyscallFn)(UINT32(ctlCode), magic, UINT32(param));
 }
 

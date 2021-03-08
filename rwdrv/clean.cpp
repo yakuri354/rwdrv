@@ -64,7 +64,7 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 	// TODO Fix this
 
 	log(skCrypt("[rwdrv] Removing Pfn database entry\n"));
-	log(skCrypt("[rwdrv] Allocating MDL for address [%p] and size %ul\n"), pageAddress, pageSize);
+	log(skCrypt("[rwdrv] Allocating MDL for address [%p] and size %u\n"), pageAddress, pageSize);
 	const auto mdl = C_FN(IoAllocateMdl)(PVOID(pageAddress), pageSize, false, false, nullptr);
 
 	if (mdl == nullptr)
@@ -82,7 +82,7 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 
 	const ULONG mdlPageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(MmGetMdlVirtualAddress(mdl), MmGetMdlByteCount(mdl));
 
-	log(skCrypt("[rwdrv] MDL page count: %ul\n"), mdlPageCount);
+	log(skCrypt("[rwdrv] MDL page count: %u\n"), mdlPageCount);
 
 	ULONG nullPfn = 0x0;
 	MM_COPY_ADDRESS sourceAddress{};
@@ -203,5 +203,7 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 	}
 
 	log(skCrypt("[rwdrv] Entry in BigPoolTable not found!\n"));
+	// return STATUS_NOT_FOUND;
 	return STATUS_SUCCESS;
 }
+
