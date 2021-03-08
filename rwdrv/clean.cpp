@@ -82,7 +82,7 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 
 	const ULONG mdlPageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(MmGetMdlVirtualAddress(mdl), MmGetMdlByteCount(mdl));
 
-	log(skCrypt("[rwdrv] MDL page count: &ul\n"), mdlPageCount);
+	log(skCrypt("[rwdrv] MDL page count: %ul\n"), mdlPageCount);
 
 	ULONG nullPfn = 0x0;
 	MM_COPY_ADDRESS sourceAddress{};
@@ -126,8 +126,8 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* pool
 		return false;
 	}
 
-	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES>(ResolveRelativeAddress(bpt, 3));
-	*poolBigPageTableSize = *static_cast<PSIZE_T>(ResolveRelativeAddress(bptSize, 3));
+	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES>(RVA(bpt, 3));
+	*poolBigPageTableSize = *static_cast<PSIZE_T>(RVA(bptSize, 3));
 	return true;
 }
 
@@ -145,19 +145,19 @@ bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPo
 	if (!exProtectPoolExCallInstructionsAddress)
 		return false;
 
-	auto exProtectPoolExAddress = ResolveRelativeAddress(exProtectPoolExCallInstructionsAddress, 1);
+	auto exProtectPoolExAddress = RVA(exProtectPoolExCallInstructionsAddress, 1);
 
 	if (!exProtectPoolExAddress)
 		return false;
 
 	const auto poolBigPageTableInstructionAddress = UINT64(exProtectPoolExAddress) + 0x95;
 	*pPoolBigPageTable = PPOOL_TRACKER_BIG_PAGES(
-		ResolveRelativeAddress(poolBigPageTableInstructionAddress, 3)
+		RVA(poolBigPageTableInstructionAddress, 3)
 	);
 
 	const auto poolBigPageTableSizeInstructionAddress = UINT64(exProtectPoolExAddress) + 0x8E;
 	*pPoolBigPageTableSize = *static_cast<SIZE_T*>(
-		ResolveRelativeAddress(poolBigPageTableSizeInstructionAddress, 3));
+		RVA(poolBigPageTableSizeInstructionAddress, 3));
 
 	return true;
 }

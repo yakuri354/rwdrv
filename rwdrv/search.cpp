@@ -75,11 +75,9 @@ NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 				if (strcmp(PCHAR(pMod[i].FullPathName),
 				           skCrypt("\\SystemRoot\\System32\\drivers\\rt640x64.sys")) == 0)
 				{
-					// DbgBreakPoint();
-					RtBase = pMod[i].ImageBase; // TODO fix
-					// RtSize = pMod[i].ImageSize;
-					RtSize = 0x108f46;
+					RtBase = pMod[i].ImageBase;
 					// The system module ranges are invalid
+					RtSize = 0x108f46;
 					rf = true;
 					continue;
 				}
@@ -109,7 +107,7 @@ NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 	return STATUS_SUCCESS;
 }
 
-PVOID Search::ResolveRelativeAddress(
+PVOID Search::RVA(
 	_In_ UINT64 instruction,
 	_In_ const ULONG offset
 )
@@ -122,8 +120,8 @@ PVOID Search::ResolveRelativeAddress(
 
 PVOID Search::ResolveEnclosingSig(UINT64 callAddress, UINT movOffset)
 {
-	const auto targetFn = UINT64(Search::ResolveRelativeAddress(callAddress, 1));
-	return Search::ResolveRelativeAddress(targetFn + movOffset, 3);
+	const auto targetFn = UINT64(Search::RVA(callAddress, 1));
+	return Search::RVA(targetFn + movOffset, 3);
 }
 
 

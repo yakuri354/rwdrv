@@ -10,7 +10,7 @@ namespace Search {
 	extern ULONG RtSize;
 
 	NTSTATUS SetKernelProps(PVOID kernelBase);
-	PVOID ResolveRelativeAddress(
+	PVOID RVA(
 		_In_ UINT64 instruction,
 		_In_ const ULONG offset
 	);

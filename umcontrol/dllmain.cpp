@@ -45,12 +45,6 @@ bool InitDriver()
 
 	lint.QuadPart = int64_t(g::State.Memory);
 
-	Sleep(3000);
-
-	log("a1 -> 0x%x\n", lint.LowPart)
-	log("a2 -> 0x%xs\n", CTL_MAGIC)
-	log("a3 -> 0x%x\n", lint.HighPart)
-
 	const auto status = DriverCall(lint.LowPart, CTL_MAGIC, lint.HighPart);
 
 	if (CTL_IS_ERROR(status))
@@ -118,13 +112,13 @@ DWORD WINAPI RealMain(void* param)
 	}
 
 	log(xs("[umc] Found hooked fn %s at [0x%p]\n"), xs(HOOKED_FN_NAME), PVOID(_DriverCtl));
-
+	
 	if (!InitDriver())
 	{
 		log(xs("[umc] Driver initialization failed\n"));
 		return -1;
 	}
-
+		
 	while (true)
 	{
 		log(xs("[umc] Loop\n"));
