@@ -1,8 +1,9 @@
 #pragma once
 
 typedef unsigned CTLTYPE;
+#define CTLSTATUSTYPE unsigned __int64
+#define CTLSTATUSBASE 0xFFFEFFFF00000000u
 #define CTLCODE constexpr CTLTYPE
-#define CTLSTATUS(st, val) constexpr unsigned __int64 CTL_##st = 0xFFFEFFFF##val;
 
 #define HOOKED_FN_NAME "OpenInputDesktop"
 #define HOOKED_FN_MODULE "User32.dll"
@@ -17,7 +18,8 @@ constexpr size_t SHMEM_SIZE = 1024 * 4;
 namespace Ctl
 {
 	CTLCODE PING = 0x01;
-	CTLCODE INIT = 0x10;
+	CTLCODE STATUS = 0x10;
+	CTLCODE UNLOAD = 0x0F;
 	CTLCODE SET_TARGET = 0x20;
 	CTLCODE READ_TARGET_MEM = 0x30;
 	CTLCODE READ_PHYS_MEM = 0x31;
@@ -25,13 +27,7 @@ namespace Ctl
 	CTLCODE WRITE_PHYS_MEM = 0x41;
 }
 
-
-CTLSTATUS(SUCCESS, FFFFFFFF)
-CTLSTATUS(GENERIC_ERROR, 00000001)
-
-
-struct GenericReadWrite
+inline unsigned __int64 NT2CTL(NTSTATUS status)
 {
-	void* Addr;
-	unsigned char buffer[SHMEM_SIZE - sizeof(void*)];
-};
+	return CTLSTATUSBASE + ULONG(status);
+}

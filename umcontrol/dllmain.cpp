@@ -9,7 +9,7 @@
 
 #define log(...) {char cad[512]; sprintf_s(cad, __VA_ARGS__);  LI_FN(OutputDebugStringA)(cad);}
 
-#define CTL_IS_ERROR(status) ((status) != CTL_SUCCESS && (status) >= CTL_GENERIC_ERROR)
+#define CTL2NT NTSTATUS
 
 PHookFn _DriverCtl = nullptr;
 
@@ -37,9 +37,7 @@ namespace g
 
 bool InitDriver()
 {
-	log(xs("[umc] Initializing driver\n"));
-
-	log(xs("[umc] Making init call, Va [%p]\n"), g::State.Memory);
+	log(xs("[umc] Initializing driver, Va [%p]\n"), g::State.Memory);
 
 	LARGE_INTEGER lint;
 
@@ -47,15 +45,21 @@ bool InitDriver()
 
 	const auto status = DriverCall(lint.LowPart, CTL_MAGIC, lint.HighPart);
 
-	if (CTL_IS_ERROR(status))
+	if (!status || HANDLE(status) == INVALID_HANDLE_VALUE)
 	{
-		log(xs("[umc] Init call failed with status 0x%llx\n"), status);
+		log(xs("[umc] Init call returned invalid value. Looks like the hook does not work, check kernel logs\n"));
 		return false;
 	}
 
-	if (!status)
+	if (status == STATUS_INVALID_PARAMETER && DriverCtl(Ctl::STATUS) == 1)
 	{
-		log(xs("[umc] Init call returned null handle. Looks like the hook does not work, check kernel logs\n"));
+		log(xs("[umc] Driver already initialized, continuing\n"));
+		return true;
+	}
+	
+	if (!NT_SUCCESS(status))
+	{
+		log(xs("[umc] Init call failed with status 0x%llx\n"), status);
 		return false;
 	}
 
@@ -107,11 +111,11 @@ DWORD WINAPI RealMain(void* param)
 
 	if (_DriverCtl == nullptr)
 	{
-		log(xs("[umc] Could not find function %s\n"), xs(HOOKED_FN_NAME));
+		log(xs("[umc] Could not find function " HOOKED_FN_NAME "\n"));
 		return -1;
 	}
 
-	log(xs("[umc] Found hooked fn %s at [0x%p]\n"), xs(HOOKED_FN_NAME), PVOID(_DriverCtl));
+	log(xs("[umc] Found hooked fn " HOOKED_FN_NAME " at [0x%p]\n"), PVOID(_DriverCtl));
 	
 	if (!InitDriver())
 	{
@@ -121,7 +125,8 @@ DWORD WINAPI RealMain(void* param)
 		
 	while (true)
 	{
-		log(xs("[umc] Loop\n"));
+		log(xs("[umc] Pinging"));
+		DriverCtl(Ctl::PING);
 		LI_FN(Sleep)(10000);
 	}
 
@@ -133,13 +138,10 @@ BOOL APIENTRY DllMain(HMODULE hModule,
                       LPVOID lpReserved
 )
 {
-	// log(xs("[umc] DllMain called\n"));
-
 	if (ul_reason_for_call == DLL_PROCESS_ATTACH)
 	{
 		log(xs("[umc] Launching thread\n"));
 		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
-		// SpoofThread(RealMain, hModule);
 	}
 
 	return TRUE;

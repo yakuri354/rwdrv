@@ -19,26 +19,26 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="clean.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="search.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="util.cpp">
+    <ClCompile Include="control.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="control.cpp">
+    <ClCompile Include="exec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="physmem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="clear.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="clean.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="search.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -58,6 +58,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="import.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="exec.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="physmem.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="clear.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

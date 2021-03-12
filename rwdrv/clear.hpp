@@ -10,5 +10,5 @@ namespace Clear
 	NTSTATUS ClearSystemBigPoolInfo(PVOID pageAddr);
 	NTSTATUS SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDispatchAddress);
 	NTSTATUS ClearPfnEntry(PVOID pageAddress, ULONG pageSize);
-	NTSTATUS ClearCIDll(const wchar_t* driverName);
+	NTSTATUS CleanupMiscTraces(DriverState* driverState);
 }

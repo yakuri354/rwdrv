@@ -67,7 +67,6 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 
 		RelocateImageByDelta(portable_executable::GetRelocs(local_image_base), kernel_image_base - nt_headers->OptionalHeader.ImageBase);
 
-#ifdef DEBUG
 		const auto imports = portable_executable::GetImports(local_image_base);
 		
 		if (!imports.empty() && !ResolveImports(iqvw64e_device_handle, imports))
@@ -76,7 +75,6 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 			kernel_image_base = realBase;
 			break;
 		}
-#endif
 
 		// Write fixed image to kernel
 
@@ -87,7 +85,6 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 			break;
 		}
 
-		// std::cout << "wrote" << std::endl;
 
 		// Call driver entry point
 

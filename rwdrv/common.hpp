@@ -20,11 +20,36 @@ constexpr bool NT_SUCCESS(NTSTATUS status)
 	return status >= 0;
 }
 
+struct HookData
+{
+	PUINT64 PtrLoc;
+	PVOID OrigPtr;
+};
+
+struct DriverState
+{
+	bool Initialized;
+	PVOID BaseAddress;
+	ULONG ImageSize;
+	HookData Syscall;
+	HookData Wmi;
+	PDRIVER_DISPATCH OriginalDiskDispatchFn;
+	PVOID SharedMemory;
+
+	HANDLE TargetProcess; // PID
+};
+
 template <typename ...A>
 __forceinline ULONG log(PCSTR format, A ...args)
 {
 	return C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, args...);
 }
+
+#ifdef DEBUG
+#define dbgLog log
+#else
+#define dbglog(...)
+#endif
 
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION
@@ -256,7 +281,9 @@ NTSTATUS NTAPI ObReferenceObjectByName(
 	PVOID ParseContext OPTIONAL,
 	PVOID* ObjectPtr);
 
-// EXTERN_C __declspec(dllimport)
+#ifdef DEBUG
+extern "C" __declspec(dllimport)
+#endif
 NTSTATUS NTAPI MmCopyVirtualMemory
 (
 	PEPROCESS SourceProcess,

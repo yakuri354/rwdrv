@@ -1,116 +1,35 @@
 #define NO_DDK
 #include <ntifs.h>
 #include "common.hpp"
-#include "clean.hpp"
+#include "clear.hpp"
 #include "search.hpp"
 #include "util.hpp"
 #include "skcrypt.hpp"
 #include "comms.hpp"
 #include "intrin.h"
+#include "exec.hpp"
 
 
 PVOID g::KernelBase;
 
-struct _DriverState
-{
-	bool Initialized;
-	PVOID BaseAddress;
-	ULONG ImageSize;
-	PVOID OriginalSyscallFn;
-	PVOID OriginalWmiFn;
-	PDRIVER_DISPATCH OriginalDiskDispatchFn;
-	PVOID SharedMemory;
-};
-
 namespace g
 {
-	::_DriverState DriverState{};
+	::DriverState DriverState{};
 }
 
-inline NTSTATUS CleanupMiscTraces()
+UINT64 __fastcall HookControl(UINT64 ctlCode, UINT64 a2, UINT64 param, UINT16 magic, UINT64 a5)
 {
-	auto status = Clear::SpoofDiskSerials(Search::KernelBase, &g::DriverState.OriginalDiskDispatchFn);
-	if (!NT_SUCCESS(status))
+	if (magic == CTL_MAGIC)
 	{
-		log(skCrypt("[rwdrv] Spoofing disk serials failed\n"));
-		return status;
-	}
-	if (g::DriverState.ImageSize >= 0x1000) {
-		status = Clear::ClearSystemBigPoolInfo(g::DriverState.BaseAddress);
-		if (!NT_SUCCESS(status))
-		{
-			log(skCrypt("[rwdrv] Clearing BigPoolInfo failed\n"));
-			return status;
-		}
-	}
-	status = Clear::ClearPfnEntry(g::DriverState.BaseAddress, g::DriverState.ImageSize);
-	if (!NT_SUCCESS(status))
-	{
-		log(skCrypt("[rwdrv] Clearing Pfn table entry failed\n"));
-		return status;
-	}
-	return STATUS_SUCCESS;
-}
-
-UINT64 __fastcall HookControl(UINT64 ctlCode, UINT64 a2, UINT64 param, UINT16 magic, UINT64 a5) // TODO Move init logic to another function or file
-{
-	// log(skCrypt("[rwdrv] Hook called!, args [0x%p] [0x%p] [0x%p] [0x%xs] [0x%p]\n"), PVOID(ctlCode), PVOID(a2), PVOID(param), magic, PVOID(a5));
-	
-	if (!g::DriverState.Initialized && magic == CTL_MAGIC)
-	{	
-		LARGE_INTEGER lint;
-		lint.LowPart = UINT32(ctlCode);
-		lint.HighPart = UINT32(param);
-
-		log(skCrypt("[rwdrv] Initializing; Shared memory at [%p]\n"), PVOID(lint.QuadPart));
-		
-		log(skCrypt("[rwdrv] CR3 [0x%p]\n"), __readcr3());
-
-
-		if (lint.QuadPart && C_FN(MmIsAddressValid)(PVOID(lint.QuadPart)))
-		{
-			*PUINT16(lint.QuadPart) = CTL_MAGIC;
-		}
-		else
-		{
-			log(skCrypt("[rwdrv] Bad shared memory Va\n"));
-			return CTL_GENERIC_ERROR; // TODO Specific status
-		}
-		
-		g::DriverState.SharedMemory = PVOID(lint.QuadPart);
-		
-		log(skCrypt("[rwdrv] Cleaning up traces\n"));
-
-		const auto status = CleanupMiscTraces();
-		
-		if (!NT_SUCCESS(status))
-		{
-			log(skCrypt("[rwdrv] Cleaning traces failed, aborting\n"));
-			return CTL_GENERIC_ERROR; // TODO Specific status
-		}
-		
-		log(skCrypt("[rwdrv] Driver successfully initialized\n"));
-		g::DriverState.Initialized = true;
-		
-		return CTL_SUCCESS;
-	}
-
-	if (UINT16(magic) == CTL_MAGIC)
-	{
-		log(skCrypt("[rwdrv] Ctl called, code [%x]\n"), UINT32(ctlCode));
-		// TODO Control codes
-		// TODO Shared memory
-		return CTL_SUCCESS;
+		return NT2CTL(ExecuteRequest(UINT32(ctlCode), UINT32(param), &g::DriverState));
 	}
 
 	if (ctlCode >= 0xffff000000000000u)
 	{
-		log(skCrypt("[rwdrv] Restoring Wmi call\n"));
-		return _WmiTraceMessage(g::DriverState.OriginalWmiFn)(ctlCode, a2, param, magic, a5);
+		return _WmiTraceMessage(g::DriverState.Wmi.OrigPtr)(ctlCode, a2, param, magic, a5);
 	}
-	
-	log(skCrypt("[rwdrv] Restoring syscall: [0x%x] [%u] [0x%x]\n"), PVOID(ctlCode), UINT32(magic), UINT32(param));
-	return PHookFn(g::DriverState.OriginalSyscallFn)(UINT32(ctlCode), magic, UINT32(param));
+
+	return PHookFn(g::DriverState.Syscall.OrigPtr)(UINT32(ctlCode), magic, UINT32(param));
 }
 
 
@@ -130,7 +49,7 @@ NTSTATUS SetupHook()
 		log(skCrypt("[rwdrv] Failed to locate syscall\n"));
 		return STATUS_UNSUCCESSFUL;
 	}
-	
+
 	auto* const syscallDataPtr = Search::RVA(syscall, 3);
 
 	log(skCrypt("[rwdrv] Syscall pointer location at [0x%p]\n"), PVOID(syscallDataPtr));
@@ -147,22 +66,25 @@ NTSTATUS SetupHook()
 		log(skCrypt("[rwdrv] Failed to locate realtek log function\n"));
 		return STATUS_UNSUCCESSFUL;
 	}
-	
+
 	auto* const rtDataPtr = Search::ResolveEnclosingSig(rtLogFn, 0x18);
 
 	log(skCrypt("[rwdrv] Realtek pointer location at [0x%p]\n"), PVOID(rtDataPtr));
-	
-	g::DriverState.OriginalSyscallFn =
+
+	g::DriverState.Syscall.OrigPtr =
 		InterlockedExchangePointer(
 			static_cast<PVOID volatile*>(syscallDataPtr),
 			Search::RVA(rtLogFn, 1)
 		);
 
-	g::DriverState.OriginalWmiFn =
+	g::DriverState.Wmi.OrigPtr =
 		InterlockedExchangePointer(
 			static_cast<PVOID volatile*>(rtDataPtr),
 			PVOID(HookControl)
 		);
+
+	g::DriverState.Syscall.PtrLoc = PUINT64(syscallDataPtr);
+	g::DriverState.Wmi.PtrLoc = PUINT64(rtDataPtr);
 	
 	log(skCrypt("[rwdrv] Successfully placed hooks\n"));
 

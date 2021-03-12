@@ -6,6 +6,8 @@
 #include "../kdmapper/kdmapper.hpp"
 #include "xorstr.hpp"
 #include "ShlObj.h"
+#include "../rwdrv/comms.hpp"
+#include "../umcontrol/lazy_importer.hpp"
 
 DWORD GetProcessByNameW(std::wstring name)
 {
@@ -29,9 +31,10 @@ DWORD GetProcessByNameW(std::wstring name)
 				pid = process.th32ProcessID;
 				break;
 			}
-		} while (Process32Next(snapshot, &process));
+		}
+		while (Process32Next(snapshot, &process));
 	}
-	
+
 	return pid;
 }
 
@@ -131,9 +134,6 @@ bool InjectDll()
 {
 	// TODO Embed encrypted dll in loader
 
-	std::cout << xs("[>] Opening msedge.exe") << std::endl;
-	std::cout << xs("[W] Warning: Do not close microsoft edge while the game is running!") << std::endl;
-
 	// PROCESS_INFORMATION pInfo{};
 	STARTUPINFO sInfo{};
 
@@ -159,7 +159,8 @@ bool InjectDll()
 	std::cout << "[?] Where to host the dll: ";
 	std::wcin >> name;
 
-	const auto hProc = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_VM_WRITE | PROCESS_HEAP_SEG_ALLOC, false, GetProcessByNameW(name));
+	const auto hProc = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_VM_WRITE | PROCESS_HEAP_SEG_ALLOC, false,
+	                               GetProcessByNameW(name));
 
 	if (hProc == nullptr || hProc == INVALID_HANDLE_VALUE)
 	{
@@ -227,7 +228,7 @@ bool InjectDll()
 		CloseHandle(hProc);
 		return false;
 	}
-	
+
 	WaitForSingleObject(hThread, INFINITE);
 	DWORD exitCode;
 	if (!GetExitCodeThread(hThread, &exitCode) || exitCode == 0)
@@ -247,33 +248,54 @@ bool InjectDll()
 	return true;
 }
 
-
-int load()
+bool load_driver()
 {
-	std::cout << xs("[>] Loading rwdrv") << std::endl;
+	std::cout << "[>] Loading driver" << std::endl;
+	
+	auto* const iqvw64e_device_handle = intel_driver::Load();
 
-	if (!IsUserAnAdmin())
+	if (!iqvw64e_device_handle || iqvw64e_device_handle == INVALID_HANDLE_VALUE)
 	{
-		std::cout << xs("[!] Loader must be launched with administrative privileges") << std::endl;
-		return 1;
+		std::cout << xs("[-] Failed to load driver iqvw64e.sys") << std::endl;
+		intel_driver::Unload(iqvw64e_device_handle);
+		return false;
 	}
 
-	srand(static_cast<unsigned>(time(nullptr)) * _getpid());
+	if (!intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle))
+	{
+		std::cout << xs("[-] Failed to ClearPiDDBCacheTable") << std::endl;
+		intel_driver::Unload(iqvw64e_device_handle);
+		return false;
+	}
 
-	 auto sc_handle = OpenSCManagerA(nullptr,
-	                                 nullptr, SC_MANAGER_ENUMERATE_SERVICE);
-	 if (!sc_handle)
-	 {
-	 	std::cout << xs("[-] Error occured while loading service manager: ") << GetLastErrorAsString() << std::
-	 		endl;
-	 	return 1;
-	 }
+	if (!kdmapper::MapDriver(iqvw64e_device_handle, ExePath() + xs("\\rwdrv.sys")))
+	{
+		std::cout << xs("[-] Failed to map rwdrv") << std::endl;
+		intel_driver::Unload(iqvw64e_device_handle);
+		return false;
+	}
 
-	 DWORD servicesBufSize{};
-	 DWORD servicesCount{};
-	 DWORD resumeHandle{};
-	
+	intel_driver::Unload(iqvw64e_device_handle);
+	std::cout << xs("[>] Successfully loaded driver") << std::endl;
+	return true;
+}
+
+bool check_serivice()
+{
+	DWORD servicesBufSize{};
+	DWORD servicesCount{};
+	DWORD resumeHandle{};
+
 	std::cout << xs("[>] Checking for BattlEye service") << std::endl;
+
+	const auto sc_handle = OpenSCManagerA(nullptr,
+	                                      nullptr, SC_MANAGER_ENUMERATE_SERVICE);
+	if (!sc_handle)
+	{
+		std::cout << xs("[-] Error occured while loading service manager: ") << GetLastErrorAsString() << std::
+			endl;
+		return false;
+	}
 
 	const auto dummy = EnumServicesStatusExW(
 		sc_handle,
@@ -293,7 +315,7 @@ int load()
 	if (GetLastError() != ERROR_MORE_DATA)
 	{
 		std::cout << xs("[-] Unexpected error in EnumServicesStatusEx") << std::endl;
-		return 1;
+		return false;
 	}
 
 	const auto svcBuf = new BYTE[servicesBufSize];
@@ -311,45 +333,80 @@ int load()
 	))
 	{
 		std::wcout << xs(L"[-] Failed to enumerate all services: ") << GetLastError() << std::endl;
-		return 1;
+		return false;
 	}
-	
+
 	for (DWORD i = 0; i < servicesCount; i++)
 	{
 		if (wcsstr(LPENUM_SERVICE_STATUS_PROCESSW(svcBuf)[i].lpServiceName, xs(L"BEService")))
 		{
 			std::cout << xs("[-] BEService is running, close the game before loading the cheat.") << std::endl;
-			return 1;
+			return false;
 		}
 	}
 
+	return true;
+}
 
-	auto* const iqvw64e_device_handle = intel_driver::Load();
-	
-	if (!iqvw64e_device_handle || iqvw64e_device_handle == INVALID_HANDLE_VALUE)
+PHookFn get_hook_fn()
+{
+	auto* dll = LI_MODULE(HOOKED_FN_MODULE).safe();
+
+	if (dll == nullptr)
 	{
-		std::cout << xs("[-] Failed to load driver iqvw64e.sys") << std::endl;
-		intel_driver::Unload(iqvw64e_device_handle);
-		return -1;
+		std::cout << "[W] Module " << xs(HOOKED_FN_MODULE) << " not loaded, attempting to load it" << std::endl;
+
+		dll = LI_FN(LoadLibraryA)(xs(HOOKED_FN_MODULE));
+
+		if (dll == nullptr || dll == INVALID_HANDLE_VALUE)
+		{
+			std::cout << "[-] Could not load module, aborting" << std::endl;
+			return nullptr;
+		}
 	}
-	
-	if (!intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle))
+
+	return LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
+}
+
+int load(bool forceReloadDrv = false)
+{
+	std::cout << xs("[>] Loading rwdrv") << std::endl;
+
+	if (!IsUserAnAdmin())
 	{
-		std::cout << xs("[-] Failed to ClearPiDDBCacheTable") << std::endl;
-		intel_driver::Unload(iqvw64e_device_handle);
-		return -1;
+		std::cout << xs("[!] Loader must be launched with administrative privileges") << std::endl;
+		return 1;
 	}
-	
-	if (!kdmapper::MapDriver(iqvw64e_device_handle, ExePath() + xs("\\rwdrv.sys")))
+
+	srand(static_cast<unsigned>(time(nullptr)) * _getpid());
+
+	if (!check_serivice())
 	{
-		std::cout << xs("[-] Failed to map rwdrv") << std::endl;
-		intel_driver::Unload(iqvw64e_device_handle);
-		return -1;
+		std::cout << xs("[-] Battleye check failed") << std::endl;
+		return 1;
 	}
-	
-	intel_driver::Unload(iqvw64e_device_handle);
-	std::cout << xs("[>] Successfully loaded kernel mode component, initializing usermode dll") << std::endl;
-	
+
+	std::cout << xs("[+] BE service not found") << std::endl;
+
+	const auto sysCall = get_hook_fn();
+	if (!sysCall)
+	{
+		std::cout << xs("[-] Failed to obtain hooked syscall") << std::endl;
+		return 1;
+	}
+
+	std::cout << xs("[+] Found syscall -> 0x") << static_cast<void*>(sysCall) << std::endl;
+
+	if (sysCall(Ctl::PING, CTL_MAGIC, NULL) == CTLSTATUSBASE && !forceReloadDrv)
+	{
+		std::cout << xs("[+] Driver already loaded, injecting dll") << std::endl;
+	}
+	else if (!load_driver())
+	{
+		std::cout << xs("[-] Failed to load driver") << std::endl;
+		return 1;
+	}
+
 	if (!InjectDll())
 	{
 		std::cout << xs("[-] Failed to load usermode dll component") << std::endl;
@@ -361,9 +418,9 @@ int load()
 	return 0;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-	const auto result = load();
+	const auto result = load(argc >= 2 && !strcmp(argv[1], xs("--forcereload")));
 
 	if (GetConsoleProcessList(nullptr, 0) == 1)
 	{

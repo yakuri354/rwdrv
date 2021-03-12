@@ -273,18 +273,21 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="clean.cpp" />
+    <ClCompile Include="clear.cpp" />
     <ClCompile Include="control.cpp" />
+    <ClCompile Include="exec.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="physmem.cpp" />
     <ClCompile Include="search.cpp" />
-    <ClCompile Include="util.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="exec.hpp" />
     <ClInclude Include="import.hpp" />
-    <ClInclude Include="clean.hpp" />
+    <ClInclude Include="clear.hpp" />
     <ClInclude Include="common.hpp" />
     <ClInclude Include="comms.hpp" />
     <ClInclude Include="control.hpp" />
+    <ClInclude Include="physmem.hpp" />
     <ClInclude Include="search.hpp" />
     <ClInclude Include="skcrypt.hpp" />
     <ClInclude Include="util.hpp" />

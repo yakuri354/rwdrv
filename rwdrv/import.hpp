@@ -71,11 +71,9 @@ Fn* LazyFnCached()
 	
 	if (cache == nullptr) {
 		auto ptr = LazyFn<Fn, Hash>();
-		// cache = PVOID(UINT64(ptr) ^ (UINT64(seedBase ^ Hash) << 32 | (seedBase ^ Hash) * 3));
-		cache = PVOID(UINT64(ptr) ^ seedBase);
+		cache = PVOID(UINT64(ptr) ^ (UINT64(Hash) << 32 | UINT64(seedBase)));
 		return ptr;
 	}
 
-	// return reinterpret_cast<Fn*>(UINT64(cache) ^ (UINT64(seedBase ^ Hash) << 32 | (seedBase ^ Hash) * 3));
-	return reinterpret_cast<Fn*>(UINT64(cache) ^ seedBase);
+	return reinterpret_cast<Fn*>(UINT64(cache) ^ (UINT64(Hash) << 32 | UINT64(seedBase)));
 }
