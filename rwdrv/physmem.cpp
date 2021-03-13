@@ -2,7 +2,7 @@
 
 ULONG_PTR Phys::GetKernelDirBase()
 {
-	const auto process = PUCHAR(C_FN(IoGetCurrentProcess)());
+	auto* const process = PUCHAR(C_FN(IoGetCurrentProcess)());
 	const auto cr3 = *PULONG_PTR(process + 0x28); //dirbase x64, 32bit is 0x18
 	return cr3;
 }
@@ -109,7 +109,7 @@ NTSTATUS Phys::ReadProcessMemory(int pid, PVOID Address, PVOID AllocatedBuffer, 
 	if (NtRet != STATUS_SUCCESS) return NtRet;
 
 
-	const auto process = PUCHAR(pProcess);
+	auto* const process = PUCHAR(pProcess);
 	const auto process_dirbase = *PULONG_PTR(process + 0x28); //dirbase x64, 32bit is 0x18
 	ObDereferenceObject(pProcess);
 

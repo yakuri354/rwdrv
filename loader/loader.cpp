@@ -318,7 +318,8 @@ bool check_serivice()
 		return false;
 	}
 
-	const auto svcBuf = new BYTE[servicesBufSize];
+	auto* const svcBuf = new BYTE[servicesBufSize];
+	
 	if (!EnumServicesStatusExW(
 		sc_handle,
 		SC_ENUM_PROCESS_INFO,

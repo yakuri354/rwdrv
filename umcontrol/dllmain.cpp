@@ -3,11 +3,10 @@
 #include "lazy_importer.hpp"
 #include "../rwdrv/comms.hpp"
 #include <iostream>
-#include <Windows.h>
-#include "../loader/xorstr.hpp"
 #include "thread.hpp"
-
-#define log(...) {char cad[512]; sprintf_s(cad, __VA_ARGS__);  LI_FN(OutputDebugStringA)(cad);}
+#include "common.hpp"
+#include "../r6s/cheat.hpp"
+#include "memory.hpp"
 
 #define CTL2NT NTSTATUS
 
@@ -17,7 +16,6 @@ __forceinline uint64_t DriverCall(uint32_t a1, uint16_t a2, uint32_t a3)
 {
 	return _DriverCtl(a1, a2, a3);
 }
-
 
 __forceinline uint64_t DriverCtl(CTLTYPE controlCode, uint32_t additionalParam = 0)
 {
@@ -51,12 +49,6 @@ bool InitDriver()
 		return false;
 	}
 
-	if (status == STATUS_INVALID_PARAMETER && DriverCtl(Ctl::STATUS) == 1)
-	{
-		log(xs("[umc] Driver already initialized, continuing\n"));
-		return true;
-	}
-	
 	if (!NT_SUCCESS(status))
 	{
 		log(xs("[umc] Init call failed with status 0x%llx\n"), status);
@@ -116,19 +108,17 @@ DWORD WINAPI RealMain(void* param)
 	}
 
 	log(xs("[umc] Found hooked fn " HOOKED_FN_NAME " at [0x%p]\n"), PVOID(_DriverCtl));
-	
+
 	if (!InitDriver())
 	{
 		log(xs("[umc] Driver initialization failed\n"));
 		return -1;
 	}
-		
-	while (true)
-	{
-		log(xs("[umc] Pinging"));
-		DriverCtl(Ctl::PING);
-		LI_FN(Sleep)(10000);
-	}
+
+	const driver_handle drv{ &DriverCtl };
+	vmem_driver mem{ g::State.Memory, SHMEM_SIZE, drv };
+
+	cheat::cheat_loop(mem);
 
 	return 0;
 }

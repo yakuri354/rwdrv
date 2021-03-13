@@ -25,14 +25,14 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 	}
 
 	const uint32_t image_size = nt_headers->OptionalHeader.SizeOfImage;
-	
-	void* local_image_base = VirtualAlloc(nullptr, image_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+	auto local_image_base = VirtualAlloc(nullptr, image_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	if (!local_image_base)
 		return 0;
 
-	DWORD TotalVirtualHeaderSize = (IMAGE_FIRST_SECTION(nt_headers))->VirtualAddress;
+	auto TotalVirtualHeaderSize = (IMAGE_FIRST_SECTION(nt_headers))->VirtualAddress;
 
-	uint64_t kernel_image_base = intel_driver::AllocatePool(iqvw64e_device_handle, nt::POOL_TYPE::NonPagedPool, image_size - TotalVirtualHeaderSize);
+	auto kernel_image_base = intel_driver::AllocatePool(iqvw64e_device_handle, nt::POOL_TYPE::NonPagedPool, image_size - TotalVirtualHeaderSize);
 
 	do
 	{
@@ -54,11 +54,11 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 		
 		for (auto i = 0; i < nt_headers->FileHeader.NumberOfSections; ++i)
 		{
-			auto local_section = reinterpret_cast<void*>(reinterpret_cast<uint64_t>(local_image_base) + current_image_section[i].VirtualAddress);
+			const auto local_section = reinterpret_cast<void*>(reinterpret_cast<uint64_t>(local_image_base) + current_image_section[i].VirtualAddress);
 			memcpy(local_section, reinterpret_cast<void*>(reinterpret_cast<uint64_t>(raw_image.data()) + current_image_section[i].PointerToRawData), current_image_section[i].SizeOfRawData);
 		}
-		
-		uint64_t realBase = kernel_image_base;
+
+		const auto realBase = kernel_image_base;
 		kernel_image_base -= TotalVirtualHeaderSize;
 
 		std::cout << "[+] Skipped 0x" << std::hex << TotalVirtualHeaderSize << " bytes of PE Header" << std::endl;

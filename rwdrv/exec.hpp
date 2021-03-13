@@ -5,4 +5,4 @@
 #include "common.hpp"
 #include "comms.hpp"
 
-NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT32 param, DriverState *driverState);
+NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState *driverState);

@@ -27,6 +27,12 @@
     <ClInclude Include="framework.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="memory.hpp">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="common.hpp">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -36,6 +42,9 @@
       <Filter>Source files</Filter>
     </ClCompile>
     <ClCompile Include="thread.cpp">
+      <Filter>Source files</Filter>
+    </ClCompile>
+    <ClCompile Include="memory.cpp">
       <Filter>Source files</Filter>
     </ClCompile>
   </ItemGroup>

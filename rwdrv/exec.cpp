@@ -1,9 +1,9 @@
 #include "exec.hpp"
 
 NTSTATUS InitDriver(UINT32 a1, UINT32 a2, DriverState* driverState);
-NTSTATUS UnloadDriver(DriverState *state);
+NTSTATUS UnloadDriver(DriverState* state);
 
-NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT32 param, DriverState* driverState)
+NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState* driverState)
 {
 	PEPROCESS proc{};
 	NTSTATUS status;
@@ -11,78 +11,115 @@ NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT32 param, DriverState* driverState)
 	PVOID pa;
 	PVOID va;
 
-	if (!driverState->Initialized) // TODO Status before init
+	if (magic == INIT_MAGIC)
 	{
-		return InitDriver(ctlCode, param, driverState);
+		if (driverState->Initialized)
+		{
+			return InitDriver(ctlCode, param, driverState);
+		}
+
+		log("Discarded init call");
+
+		return STATUS_SUCCESS;
 	}
 
-	switch (ctlCode)
-	{
-	case Ctl::PING:
-		log(skCrypt("[rwdrv] Ping received\n"));
-		return STATUS_SUCCESS;
+	if (magic == CTL_MAGIC)
+		switch (ctlCode)
+		{
+		case Ctl::PING:
+			log("Ping received");
+			return STATUS_SUCCESS;
 
-	case Ctl::STATUS: // TODO Status bitmask
-		log(skCrypt("[rwdrv] Status requested\n"));
-		return driverState->Initialized ? 1 : 0;
+		case Ctl::STATUS: // TODO Status bitmask
+			log("Status requested");
+			return driverState->Initialized ? 1 : 0;
 
-	case Ctl::UNLOAD:
-		log(skCrypt("[rwdrv] Unloading driver\n"));
-		return UnloadDriver(driverState);
-		
-	case Ctl::SET_TARGET:
-		driverState->TargetProcess = HANDLE(param);
-		return STATUS_SUCCESS;
+		case Ctl::UNLOAD:
+			log("Unloading driver");
+			return UnloadDriver(driverState);
 
-	case Ctl::READ_PHYS_MEM:
-		pa = *static_cast<PVOID*>(driverState->SharedMemory);
-		return Phys::ReadPhysicalAddress(pa, driverState->SharedMemory, SIZE_T(param), &bytes);
+		case Ctl::SET_TARGET:
+			log("Target set to %u", param);
+			driverState->TargetProcess = HANDLE(param);
+			return STATUS_SUCCESS;
 
-	case Ctl::WRITE_PHYS_MEM:
-		pa = *static_cast<PVOID*>(driverState->SharedMemory);
-		return Phys::WritePhysicalAddress(pa, driverState->SharedMemory, SIZE_T(param), &bytes);
+		case Ctl::GET_BASE_ADDR:
+			log("Getting base address of process %u", param);
+			status = C_FN(PsLookupProcessByProcessId)(HANDLE(param), &proc);
+			if (!NT_SUCCESS(status))
+			{
+				log("Could not find process");
+				return STATUS_NOT_FOUND;
+			}
 
-	case Ctl::READ_TARGET_MEM:
-		if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(driverState->TargetProcess, &proc))) return STATUS_NOT_FOUND;
+			KeAttachProcess(proc);
+			va = C_FN(PsGetProcessSectionBaseAddress)(proc);
+			KeDetachProcess();
 
-		va = *static_cast<PVOID*>(driverState->SharedMemory);
+			if (!va)
+			{
+				log("Could not find base");
+				return STATUS_UNSUCCESSFUL;
+			}
 
-		status = C_FN(MmCopyVirtualMemory)(
-			proc,
-			va,
-			C_FN(IoGetCurrentProcess)(),
-			driverState->SharedMemory,
-			param,
-			UserMode,
-			&bytes
-		);
+			*PUINT64(driverState->SharedMemory) = UINT64(va);
 
-		C_FN(ObfDereferenceObject)(proc);
+			return STATUS_SUCCESS;
 
-		return status;
+		case Ctl::READ_PHYS_MEM:
+			pa = *static_cast<PVOID*>(driverState->SharedMemory);
+			return Phys::ReadPhysicalAddress(pa, driverState->SharedMemory, SIZE_T(param), &bytes);
 
-	case Ctl::WRITE_TARGET_MEM:
-		if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(driverState->TargetProcess, &proc))) return STATUS_NOT_FOUND;
+		case Ctl::WRITE_PHYS_MEM:
+			pa = *static_cast<PVOID*>(driverState->SharedMemory);
+			return Phys::WritePhysicalAddress(pa, driverState->SharedMemory, SIZE_T(param), &bytes);
 
-		va = *reinterpret_cast<PVOID*>(UINT64(driverState->SharedMemory) + 8);
+		case Ctl::READ_TARGET_MEM:
+			if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(driverState->TargetProcess, &proc))) return
+				STATUS_NOT_FOUND;
 
-		status = C_FN(MmCopyVirtualMemory)(
-			C_FN(IoGetCurrentProcess)(),
-			driverState->SharedMemory,
-			proc,
-			va,
-			param,
-			UserMode,
-			&bytes
-		);
+			va = *static_cast<PVOID*>(driverState->SharedMemory);
 
-		C_FN(ObfDereferenceObject)(proc);
-		
-		return status;
+			status = C_FN(MmCopyVirtualMemory)(
+				proc,
+				va,
+				C_FN(IoGetCurrentProcess)(),
+				driverState->SharedMemory,
+				param,
+				UserMode,
+				&bytes
+			);
 
-	default:
-		return STATUS_INVALID_PARAMETER;
-	}
+			C_FN(ObfDereferenceObject)(proc);
+
+			return status;
+
+		case Ctl::WRITE_TARGET_MEM:
+			if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(driverState->TargetProcess, &proc))) return
+				STATUS_NOT_FOUND;
+
+			va = *reinterpret_cast<PVOID*>(UINT64(driverState->SharedMemory) + 8);
+
+			status = C_FN(MmCopyVirtualMemory)(
+				C_FN(IoGetCurrentProcess)(),
+				driverState->SharedMemory,
+				proc,
+				va,
+				param,
+				UserMode,
+				&bytes
+			);
+
+			C_FN(ObfDereferenceObject)(proc);
+
+			return status;
+
+		default:
+			return STATUS_INVALID_PARAMETER;
+		}
+	
+	ASSERT((false /* This should not be reached */));
+	return STATUS_UNSUCCESSFUL;
 }
 
 NTSTATUS InitDriver(UINT32 a1, UINT32 a2, DriverState* driverState)
@@ -91,9 +128,9 @@ NTSTATUS InitDriver(UINT32 a1, UINT32 a2, DriverState* driverState)
 	lint.LowPart = UINT32(a1);
 	lint.HighPart = UINT32(a2);
 
-	log(skCrypt("[rwdrv] Initializing; Shared memory at [%p]\n"), PVOID(lint.QuadPart));
+	log("Initializing; Shared memory at [%p]", PVOID(lint.QuadPart));
 
-	dbgLog(skCrypt("[rwdrv] CR3 [0x%p]\n"), __readcr3());
+	dbgLog("CR3 [0x%llx]", __readcr3());
 
 	if (lint.QuadPart && C_FN(MmIsAddressValid)(PVOID(lint.QuadPart)))
 	{
@@ -101,35 +138,35 @@ NTSTATUS InitDriver(UINT32 a1, UINT32 a2, DriverState* driverState)
 	}
 	else
 	{
-		log(skCrypt("[rwdrv] Bad shared memory Va\n"));
-		return STATUS_UNSUCCESSFUL; // TODO Specific status
+		log("Bad shared memory Va");
+		return STATUS_UNSUCCESSFUL;
 	}
 
 	driverState->SharedMemory = PVOID(lint.QuadPart);
 
-	log(skCrypt("[rwdrv] Cleaning up traces\n"));
+	log("Cleaning up traces");
 
 	const auto status = Clear::CleanupMiscTraces(driverState);
 
 	if (!NT_SUCCESS(status))
 	{
-		log(skCrypt("[rwdrv] Cleaning traces failed, aborting\n"));
-		return STATUS_UNSUCCESSFUL; // TODO Specific status
+		log("Cleaning traces failed, aborting");
+		return STATUS_UNSUCCESSFUL;
 	}
 
-	log(skCrypt("[rwdrv] Driver successfully initialized\n"));
+	log("Driver successfully initialized");
 	driverState->Initialized = true;
 
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS UnloadDriver(DriverState *state)
+NTSTATUS UnloadDriver(DriverState* state)
 {
 	InterlockedExchangePointer(
 		reinterpret_cast<volatile PVOID*>(state->Syscall.PtrLoc),
 		state->Syscall.OrigPtr
 	);
-	
+
 	InterlockedExchangePointer(
 		reinterpret_cast<volatile PVOID*>(state->Wmi.PtrLoc),
 		state->Wmi.OrigPtr

@@ -23,7 +23,7 @@ NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 	auto status = C_FN(ZwQuerySystemInformation)(SystemModuleInformation, nullptr, bytes, &bytes);
 	if (bytes == 0)
 	{
-		log(skCrypt("[rwdrv] Invalid SystemModuleInformation size\n"));
+		log("Invalid SystemModuleInformation size");
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -39,7 +39,7 @@ NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 
 	status = C_FN(ZwQuerySystemInformation)(SystemModuleInformation, pMods, bytes, &bytes);
 
-	log(skCrypt("[rwdrv] Searching trough %d modules\n"), pMods->NumberOfModules);
+	log("Searching trough %d modules", pMods->NumberOfModules);
 
 	auto kf = false, wf = false, rf = false; // TODO Refactor & implement hashing
 
@@ -77,7 +77,13 @@ NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 				{
 					RtBase = pMod[i].ImageBase;
 					// The system module ranges are invalid
-					RtSize = 0x108f46;
+					if (pMod[i].ImageSize == 0x111000) RtSize = 0x108F46;
+					else if (pMod[i].ImageSize == 0x0AD000) RtSize = 0xA4EDA;
+					else
+					{
+						log("Unsupported version of realtek driver");
+						continue;
+					}
 					rf = true;
 					continue;
 				}
@@ -93,17 +99,17 @@ NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 	{
 		C_FN(ExFreePoolWithTag)(pMods, BB_POOL_TAG);
 	}
-	
+
 	if (!wf || !kf || !rf)
 	{
-		log(skCrypt("[rwdrv] Could not find base addresses of modules; kernel: %d; win32kbase: %d; rt640: %d\n"), kf, wf, rf);
+		log("Could not find base addresses of modules; kernel: %d; win32kbase: %d; rt640: %d", kf, wf, rf);
 		return STATUS_NOT_FOUND;
 	}
 
-	log(skCrypt("[rwdrv] KernelBase: [0x%p]\n"), KernelBase);
-	log(skCrypt("[rwdrv] Win32kBase: [0x%p]\n"), Win32kBase);
-	log(skCrypt("[rwdrv] RtBase: [0x%p]\n"), RtBase);
-	log(skCrypt("[rwdrv] RtSize: [0x%x]\n"), RtSize);
+	log("KernelBase: [0x%p]", KernelBase);
+	log("Win32kBase: [0x%p]", Win32kBase);
+	log("RtBase: [0x%p]", RtBase);
+	log("RtSize: [0x%x]", RtSize);
 	return STATUS_SUCCESS;
 }
 

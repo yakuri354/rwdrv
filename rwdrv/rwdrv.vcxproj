@@ -274,7 +274,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="clear.cpp" />
-    <ClCompile Include="control.cpp" />
     <ClCompile Include="exec.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="physmem.cpp" />
@@ -286,7 +285,6 @@
     <ClInclude Include="clear.hpp" />
     <ClInclude Include="common.hpp" />
     <ClInclude Include="comms.hpp" />
-    <ClInclude Include="control.hpp" />
     <ClInclude Include="physmem.hpp" />
     <ClInclude Include="search.hpp" />
     <ClInclude Include="skcrypt.hpp" />

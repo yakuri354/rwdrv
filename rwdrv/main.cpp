@@ -3,7 +3,6 @@
 #include "common.hpp"
 #include "clear.hpp"
 #include "search.hpp"
-#include "util.hpp"
 #include "skcrypt.hpp"
 #include "comms.hpp"
 #include "intrin.h"
@@ -19,9 +18,9 @@ namespace g
 
 UINT64 __fastcall HookControl(UINT64 ctlCode, UINT64 a2, UINT64 param, UINT16 magic, UINT64 a5)
 {
-	if (magic == CTL_MAGIC)
+	if (magic == CTL_MAGIC || magic == INIT_MAGIC)
 	{
-		return NT2CTL(ExecuteRequest(UINT32(ctlCode), UINT32(param), &g::DriverState));
+		return NT2CTL(ExecuteRequest(UINT32(ctlCode), magic, UINT32(param), &g::DriverState));
 	}
 
 	if (ctlCode >= 0xffff000000000000u)
@@ -41,35 +40,35 @@ NTSTATUS SetupHook()
 		UINT64(Search::Win32kBase),
 		Search::Win32kSize,
 		PUCHAR(PCHAR(skCrypt("\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x10\x44\x8B\xC7\x8B\xD6\x8B\xCD"))),
-		skCrypt("xxx????xxxxxxxxxxxx")
+		PCHAR(skCrypt("xxx????xxxxxxxxxxxx"))
 	);
 
 	if (syscall == NULL)
 	{
-		log(skCrypt("[rwdrv] Failed to locate syscall\n"));
+		log("Failed to locate syscall");
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	auto* const syscallDataPtr = Search::RVA(syscall, 3);
 
-	log(skCrypt("[rwdrv] Syscall pointer location at [0x%p]\n"), PVOID(syscallDataPtr));
+	log("Syscall pointer location at [0x%p]", PVOID(syscallDataPtr));
 
 	const auto rtLogFn = Search::FindPattern(
 		UINT64(Search::RtBase),
 		Search::RtSize,
 		PUCHAR(PCHAR(skCrypt("\xE8\x00\x00\x00\x00\x4C\x8D\x5C\x24\x70\x8B\xC3"))),
-		skCrypt("x????xxxxxxx")
+		PCHAR(skCrypt("x????xxxxxxx"))
 	);
 
 	if (rtLogFn == NULL)
 	{
-		log(skCrypt("[rwdrv] Failed to locate realtek log function\n"));
+		log("Failed to locate realtek log function");
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	auto* const rtDataPtr = Search::ResolveEnclosingSig(rtLogFn, 0x18);
 
-	log(skCrypt("[rwdrv] Realtek pointer location at [0x%p]\n"), PVOID(rtDataPtr));
+	log("Realtek pointer location at [0x%p]", PVOID(rtDataPtr));
 
 	g::DriverState.Syscall.OrigPtr =
 		InterlockedExchangePointer(
@@ -86,7 +85,7 @@ NTSTATUS SetupHook()
 	g::DriverState.Syscall.PtrLoc = PUINT64(syscallDataPtr);
 	g::DriverState.Wmi.PtrLoc = PUINT64(rtDataPtr);
 	
-	log(skCrypt("[rwdrv] Successfully placed hooks\n"));
+	log("Successfully placed hooks");
 
 	return STATUS_SUCCESS;
 }
@@ -105,7 +104,7 @@ bool CheckPEImage(PVOID imgBase)
 		return false;
 	}
 
-	auto* pInh = PIMAGE_NT_HEADERS(LPBYTE(imgBase) + pIdh->e_lfanew);
+	auto* pInh = PIMAGE_NT_HEADERS(UINT64(imgBase) + pIdh->e_lfanew);
 
 	if (pInh->Signature != IMAGE_NT_SIGNATURE)
 	{
@@ -129,7 +128,7 @@ NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
 	const auto status = Search::SetKernelProps(kernelBase);
 	if (!NT_SUCCESS(status))
 	{
-		log(skCrypt("[rwdrv] Failed to obtain kernel modules\n"));
+		log("Failed to obtain kernel modules");
 	}
 
 	return status;
@@ -143,21 +142,22 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
 	{
 		return STATUS_INVALID_PARAMETER;
 	}
+	
 	g::KernelBase = kernelBase;
 
-	log(skCrypt("[rwdrv] Driver loaded at [0x%p]\n"), baseAddress);
+	log("Driver loaded at [0x%p]", baseAddress);
 
 	auto status = InitRoutine(baseAddress, imageSize, kernelBase);
 	if (!NT_SUCCESS(status))
 	{
-		log(skCrypt("[rwdrv] Driver initialization routine failed.\n"));
+		log("Driver initialization routine failed.");
 		return status;
 	}
 
 	status = SetupHook();
 	if (!NT_SUCCESS(status))
 	{
-		log(skCrypt("[rwdrv] Failed to setup communication hook\n"));
+		log("Failed to setup communication hook");
 		return status;
 	}
 

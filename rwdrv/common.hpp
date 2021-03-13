@@ -39,17 +39,25 @@ struct DriverState
 	HANDLE TargetProcess; // PID
 };
 
-template <typename ...A>
-__forceinline ULONG log(PCSTR format, A ...args)
-{
-	return C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, args...);
-}
-
 #ifdef DEBUG
+
+#define log(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "[rwdrv] " fmt "\n", ##__VA_ARGS__)
 #define dbgLog log
+
+#define ASSERT_TRUE(exp) ASSERT(exp)
+
 #else
+
+#define log(fmt, ...) {auto crypter = skCrypt("[rwdrv] " fmt "\n"); C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, crypter, ##__VA_ARGS__); crypter.clear(); }(1)
 #define dbglog(...)
+
+#define ASSERT_TRUE( exp ) \
+    ((!(exp)) ? \
+        (C_FN(RtlAssert)( (PVOID)#exp, (PVOID)__FILE__, __LINE__, NULL ),FALSE) : \
+        TRUE)
+
 #endif
+
 
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION
@@ -71,15 +79,6 @@ typedef struct _RTL_PROCESS_MODULES
 	ULONG NumberOfModules;
 	RTL_PROCESS_MODULE_INFORMATION Modules[1];
 } RTL_PROCESS_MODULES, * PRTL_PROCESS_MODULES;
-
-struct PiDDBCacheEntry
-{
-	LIST_ENTRY List;
-	UNICODE_STRING DriverName;
-	ULONG TimeDateStamp;
-	NTSTATUS LoadStatus;
-	char _0x0028[16]; // data from the shim engine, or uninitialized memory for custom drivers
-};
 
 typedef enum _SYSTEM_INFORMATION_CLASS
 {
@@ -294,3 +293,8 @@ NTSTATUS NTAPI MmCopyVirtualMemory
 	KPROCESSOR_MODE PreviousMode,
 	PSIZE_T ReturnSize
 );
+
+#ifdef DEBUG
+extern "C" __declspec(dllimport)
+#endif
+PVOID PsGetProcessSectionBaseAddress(__in PEPROCESS Process);

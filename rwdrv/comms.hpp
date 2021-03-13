@@ -8,7 +8,8 @@ typedef unsigned CTLTYPE;
 #define HOOKED_FN_NAME "OpenInputDesktop"
 #define HOOKED_FN_MODULE "User32.dll"
 
-constexpr UINT16 CTL_MAGIC = 0xFFAB;
+constexpr UINT16 CTL_MAGIC = 0xFFAB; // Special calls for initialization
+constexpr UINT16 INIT_MAGIC = 0xFFAC;
 
 typedef UINT64 (__fastcall *PHookFn)(UINT32, UINT16, UINT32);
 typedef UINT64 (__fastcall *_WmiTraceMessage)(UINT64, UINT64, UINT64, UINT64, UINT64);
@@ -21,6 +22,7 @@ namespace Ctl
 	CTLCODE STATUS = 0x10;
 	CTLCODE UNLOAD = 0x0F;
 	CTLCODE SET_TARGET = 0x20;
+	CTLCODE GET_BASE_ADDR = 0x21;
 	CTLCODE READ_TARGET_MEM = 0x30;
 	CTLCODE READ_PHYS_MEM = 0x31;
 	CTLCODE WRITE_TARGET_MEM = 0x40;

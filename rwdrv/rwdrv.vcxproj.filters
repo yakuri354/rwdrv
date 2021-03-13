@@ -25,9 +25,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="control.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="exec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -52,9 +49,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="comms.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="control.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="import.hpp">
