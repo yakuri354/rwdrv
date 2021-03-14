@@ -13,14 +13,7 @@ NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState*
 
 	if (magic == INIT_MAGIC)
 	{
-		if (driverState->Initialized)
-		{
-			return InitDriver(ctlCode, param, driverState);
-		}
-
-		log("Discarded init call");
-
-		return STATUS_SUCCESS;
+		return InitDriver(ctlCode, param, driverState);
 	}
 
 	if (magic == CTL_MAGIC)
@@ -91,6 +84,8 @@ NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState*
 			);
 
 			C_FN(ObfDereferenceObject)(proc);
+			
+			if (!NT_SUCCESS(status)) log("Va read at [0x%p] failed with status 0x%x", va, status);
 
 			return status;
 
@@ -112,9 +107,12 @@ NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState*
 
 			C_FN(ObfDereferenceObject)(proc);
 
+			if (!NT_SUCCESS(status)) log("Va write at [0x%p] failed with status 0x%x", va, status);
+
 			return status;
 
 		default:
+			log("Invalid ctlCode received: 0x%x", ctlCode);
 			return STATUS_INVALID_PARAMETER;
 		}
 	
@@ -134,7 +132,7 @@ NTSTATUS InitDriver(UINT32 a1, UINT32 a2, DriverState* driverState)
 
 	if (lint.QuadPart && C_FN(MmIsAddressValid)(PVOID(lint.QuadPart)))
 	{
-		*PUINT16(lint.QuadPart) = CTL_MAGIC;
+		*PUINT16(lint.QuadPart) = INIT_MAGIC;
 	}
 	else
 	{
@@ -144,18 +142,22 @@ NTSTATUS InitDriver(UINT32 a1, UINT32 a2, DriverState* driverState)
 
 	driverState->SharedMemory = PVOID(lint.QuadPart);
 
-	log("Cleaning up traces");
+	if (!driverState->Initialized) {
+		
+		log("First init call; Cleaning up traces");
 
-	const auto status = Clear::CleanupMiscTraces(driverState);
+		const auto status = Clear::CleanupMiscTraces(driverState);
 
-	if (!NT_SUCCESS(status))
-	{
-		log("Cleaning traces failed, aborting");
-		return STATUS_UNSUCCESSFUL;
+		if (!NT_SUCCESS(status))
+		{
+			log("Cleaning traces failed, aborting");
+			return STATUS_UNSUCCESSFUL;
+		}
+
+		log("Driver successfully initialized");
+		driverState->Initialized = true;
 	}
-
-	log("Driver successfully initialized");
-	driverState->Initialized = true;
+	else log("Traces already cleaned, continuing");
 
 	return STATUS_SUCCESS;
 }

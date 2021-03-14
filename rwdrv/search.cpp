@@ -78,7 +78,6 @@ NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 					RtBase = pMod[i].ImageBase;
 					// The system module ranges are invalid
 					if (pMod[i].ImageSize == 0x111000) RtSize = 0x108F46;
-					else if (pMod[i].ImageSize == 0x0AD000) RtSize = 0xA4EDA;
 					else
 					{
 						log("Unsupported version of realtek driver");

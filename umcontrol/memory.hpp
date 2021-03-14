@@ -63,13 +63,13 @@ T memory::read(void* addr)
 
 	if (sizeof(T) > size)
 	{
-		log(xs("[umc] Value too big"));
+		log("Value too big");
 		throw std::exception("value too big");
 	}
 
 	if (!read_raw(addr, sizeof(T)))
 	{
-		log(xs("[umc] Value read failed"));
+		log("Value read failed");
 		throw std::exception("read failed");
 	}
 
@@ -89,7 +89,7 @@ void memory::write(void* addr, T value)
 
 	if (sizeof(T) > size)
 	{
-		log(xs("[umc] Value too big"));
+		log("Value too big");
 		throw std::exception("value too big");
 	}
 
@@ -97,7 +97,7 @@ void memory::write(void* addr, T value)
 	
 	if (!write_raw(addr, sizeof(T)))
 	{
-		log(xs("[umc] Value read failed"));
+		log("Value read failed");
 		throw std::exception("write failed");
 	}
 }

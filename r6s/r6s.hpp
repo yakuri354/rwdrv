@@ -8,6 +8,7 @@ namespace r6s
 	namespace offsets
 	{
 		constexpr auto game_manager = 0x6E444A0;
+		constexpr auto glow_manager = 0x5E10620;
 		constexpr auto fov_manager = 0xE39BCCD3;
 		constexpr auto profile_manager = 0x5E380E0;
 		constexpr auto network_manager = 0x2B1319B;
@@ -27,6 +28,7 @@ namespace r6s
 	class game
 	{
 		[[nodiscard]] uintptr_t game_manager() const;
+		[[nodiscard]] uintptr_t glow_manager() const;
 		[[nodiscard]] uintptr_t round_manager() const;
 		[[nodiscard]] uintptr_t entity_list() const;
 		[[nodiscard]] uint32_t entity_count() const;
@@ -40,5 +42,6 @@ namespace r6s
 		explicit game(memory& _mem);
 		
 		void cav_esp(bool active) const;
+		void glow(bool active) const;
 	};
 }

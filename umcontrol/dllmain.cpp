@@ -8,13 +8,11 @@
 #include "../r6s/cheat.hpp"
 #include "memory.hpp"
 
-#define CTL2NT NTSTATUS
-
-PHookFn _DriverCtl = nullptr;
+PHookFn HookedFn = nullptr;
 
 __forceinline uint64_t DriverCall(uint32_t a1, uint16_t a2, uint32_t a3)
 {
-	return _DriverCtl(a1, a2, a3);
+	return HookedFn(a1, a2, a3);
 }
 
 __forceinline uint64_t DriverCtl(CTLTYPE controlCode, uint32_t additionalParam = 0)
@@ -35,83 +33,83 @@ namespace g
 
 bool InitDriver()
 {
-	log(xs("[umc] Initializing driver, Va [%p]\n"), g::State.Memory);
+	log("Initializing driver, Va [%p]", g::State.Memory);
 
 	LARGE_INTEGER lint;
 
 	lint.QuadPart = int64_t(g::State.Memory);
 
-	const auto status = DriverCall(lint.LowPart, CTL_MAGIC, lint.HighPart);
+	const auto status = DriverCall(lint.LowPart, INIT_MAGIC, lint.HighPart);
 
 	if (!status || HANDLE(status) == INVALID_HANDLE_VALUE)
 	{
-		log(xs("[umc] Init call returned invalid value. Looks like the hook does not work, check kernel logs\n"));
+		log("Init call returned invalid value. Looks like the hook does not work, check kernel logs");
 		return false;
 	}
 
 	if (!NT_SUCCESS(status))
 	{
-		log(xs("[umc] Init call failed with status 0x%llx\n"), status);
+		log("Init call failed with status 0x%llx", status);
 		return false;
 	}
 
-	if (*static_cast<uint16_t*>(g::State.Memory) != CTL_MAGIC)
+	if (*static_cast<uint16_t*>(g::State.Memory) != INIT_MAGIC)
 	{
-		log(xs("[umc] Probe write failed\n"));
+		log("Probe write failed");
 		return false;
 	}
 
-	log(xs("[umc] Driver successfully initialized\n"));
+	log("Driver successfully initialized");
 
 	return true;
 }
 
 DWORD WINAPI RealMain(void* param)
 {
-	log(xs("[umc] Starting initialization\n"));
+	log("Starting initialization");
 
 	g::State.Memory = LI_FN(VirtualAlloc)(nullptr, SHMEM_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
 	if (g::State.Memory == nullptr)
 	{
-		log(xs("[umc] Allocating shared buffer failed\n"));
+		log("Allocating shared buffer failed");
 		return false;
 	}
 
-	log(xs("[umc] Allocated shared buffer at [%p]\n"), g::State.Memory);
+	log("Allocated shared buffer at [%p]", g::State.Memory);
 
 	RtlZeroMemory(g::State.Memory, SHMEM_SIZE);
 
-	log(xs("[umc] Retrieving hooked fn\n"));
+	log("Retrieving hooked fn");
 
 	auto* dll = LI_MODULE(HOOKED_FN_MODULE).safe();
 
 	if (dll == nullptr)
 	{
-		log(xs("[umc] Module %s not loaded, attempting to load it\n"), xs(HOOKED_FN_MODULE));
+		log("Module " HOOKED_FN_MODULE " not loaded, attempting to load it");
 
 		dll = LI_FN(LoadLibraryA)(xs(HOOKED_FN_MODULE));
 
 		if (dll == nullptr || dll == INVALID_HANDLE_VALUE)
 		{
-			log(xs("[umc] Could not load module, aborting\n"));
+			log("Could not load module, aborting");
 			return false;
 		}
 	}
 
-	_DriverCtl = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
+	HookedFn = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
 
-	if (_DriverCtl == nullptr)
+	if (HookedFn == nullptr)
 	{
-		log(xs("[umc] Could not find function " HOOKED_FN_NAME "\n"));
+		log("Could not find function " HOOKED_FN_NAME "");
 		return -1;
 	}
 
-	log(xs("[umc] Found hooked fn " HOOKED_FN_NAME " at [0x%p]\n"), PVOID(_DriverCtl));
+	log("Found hooked fn " HOOKED_FN_NAME " at [0x%p]", PVOID(HookedFn));
 
 	if (!InitDriver())
 	{
-		log(xs("[umc] Driver initialization failed\n"));
+		log("Driver initialization failed");
 		return -1;
 	}
 
@@ -130,7 +128,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 {
 	if (ul_reason_for_call == DLL_PROCESS_ATTACH)
 	{
-		log(xs("[umc] Launching thread\n"));
+		log("Launching thread");
 		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
 	}
 

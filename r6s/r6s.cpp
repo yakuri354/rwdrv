@@ -2,33 +2,43 @@
 
 r6s::game::game(memory& _mem): mem(_mem)
 {
-	const auto name = std::wstring(xs(L"RainbowSix.exe"));
+	const auto name = std::wstring(xs(GAME_NAME));
 	const auto pid = util::process_id(name);
 	const auto status = mem.attach(pid);
 
-	if (!status)
+	if (!pid || !status)
 	{
-		log(xs("[umc] Could not find R6S"));
+		log("Could not find R6S");
 		throw std::exception("could not find r6s");
 	}
 
 	base = PVOID(mem.base(pid));
+	logD("Game object initialized");
 }
 
 uintptr_t r6s::game::game_manager() const
 {
+	marker();
 	return mem.read<uintptr_t>(uint64_t(base) + (offsets::game_manager));
+}
+
+uintptr_t r6s::game::glow_manager() const
+{
+	marker();
+	return mem.read<uintptr_t>(uintptr_t(base) + offsets::glow_manager);
 }
 
 uintptr_t r6s::game::round_manager() const
 {
+	marker();
 	return mem.read<uintptr_t>(uint64_t(base) + (offsets::round_manager));
 }
 
 uintptr_t r6s::game::entity_list() const
 {
-	auto el = game_manager();
-	el = mem.read<uintptr_t>(el + 0xE0);
+	marker();
+	const auto gm = game_manager();
+	auto el = mem.read<uintptr_t>(gm + 0xE0);
 
 	el ^= 0x53;
 	el += 0xEEBD43B91E3D5D54;
@@ -39,6 +49,7 @@ uintptr_t r6s::game::entity_list() const
 
 uint32_t r6s::game::entity_count() const
 {
+	marker();
 	auto ec = mem.read<uintptr_t>(game_manager() + 0xE8);
 
 	ec ^= 0x53;
@@ -50,6 +61,7 @@ uint32_t r6s::game::entity_count() const
 
 uintptr_t r6s::game::entity_info(uintptr_t entity) const
 {
+	marker();
 	auto info = mem.read<uintptr_t>(entity + 0x50);
 	info = _rotl64(info, 1);
 	info -= 0x53;
@@ -58,6 +70,7 @@ uintptr_t r6s::game::entity_info(uintptr_t entity) const
 
 bool r6s::game::game_state() const
 {
+	marker();
 	const auto phase = mem.read<uint8_t>(round_manager() + 0x300);
 
 	return phase == 2 || phase == 3;
@@ -96,4 +109,9 @@ void r6s::game::cav_esp(bool active) const
 	}
 
 	return;
+}
+
+void r6s::game::glow(bool active) const
+{
+	
 }

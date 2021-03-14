@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <string>
 
+#define GAME_NAME L"RainbowSix.exe"
+
 namespace util
 {
 	uint32_t process_id(const std::wstring& name);
