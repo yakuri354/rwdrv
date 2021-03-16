@@ -280,6 +280,7 @@
     <ClCompile Include="search.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="config.hpp" />
     <ClInclude Include="exec.hpp" />
     <ClInclude Include="import.hpp" />
     <ClInclude Include="clear.hpp" />

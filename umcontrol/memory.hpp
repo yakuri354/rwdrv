@@ -31,10 +31,10 @@ struct memory
 	T read(uintptr_t addr);
 
 	template <typename T>
-	void write(void* addr, T value);
+	void write(void* addr, const T& value);
 
 	template <typename T>
-	void write(uintptr_t addr, T value);
+	void write(uintptr_t addr, const T& value);
 	
 	virtual std::pair<void*, size_t> buf() = 0;
 	virtual ~memory() = default;
@@ -83,7 +83,7 @@ T memory::read(const uintptr_t addr)
 }
 
 template <typename T>
-void memory::write(void* addr, T value)
+void memory::write(void* addr, const T& value)
 {
 	auto [buffer, size] = buf();
 
@@ -93,7 +93,7 @@ void memory::write(void* addr, T value)
 		throw std::exception("value too big");
 	}
 
-	*static_cast<T*>(buffer) = value;
+	memcpy(buffer, &value, sizeof(T));
 	
 	if (!write_raw(addr, sizeof(T)))
 	{
@@ -103,7 +103,7 @@ void memory::write(void* addr, T value)
 }
 
 template <typename T>
-void memory::write(uintptr_t addr, T value)
+void memory::write(uintptr_t addr, const T& value)
 {
 	write(PVOID(addr), value);
 }

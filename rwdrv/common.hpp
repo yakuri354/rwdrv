@@ -49,7 +49,7 @@ struct DriverState
 #else
 
 #define log(fmt, ...) {auto crypter = skCrypt("[rwdrv] " fmt "\n"); C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, crypter, ##__VA_ARGS__); crypter.clear(); }(1)
-#define dbglog(...)
+#define dbgLog(...)
 
 #define ASSERT_TRUE( exp ) \
     ((!(exp)) ? \

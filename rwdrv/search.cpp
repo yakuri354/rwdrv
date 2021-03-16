@@ -1,7 +1,5 @@
-#include "common.hpp"
 #include "search.hpp"
 #include "skcrypt.hpp"
-#include "util.hpp"
 
 PVOID Search::KernelBase = nullptr;
 ULONG Search::KernelSize = 0;

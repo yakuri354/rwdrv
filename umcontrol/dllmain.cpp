@@ -5,7 +5,7 @@
 #include <iostream>
 #include "thread.hpp"
 #include "common.hpp"
-#include "../r6s/cheat.hpp"
+#include "../apex/cheat.h"
 #include "memory.hpp"
 
 PHookFn HookedFn = nullptr;
@@ -116,7 +116,7 @@ DWORD WINAPI RealMain(void* param)
 	const driver_handle drv{ &DriverCtl };
 	vmem_driver mem{ g::State.Memory, SHMEM_SIZE, drv };
 
-	cheat::cheat_loop(mem);
+	cheat::run(mem);
 
 	return 0;
 }

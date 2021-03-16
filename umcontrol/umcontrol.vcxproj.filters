@@ -33,6 +33,12 @@
     <ClInclude Include="common.hpp">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="util.hpp">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="hostframework.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

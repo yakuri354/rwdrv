@@ -35,7 +35,7 @@ bool vmem_driver::read_raw(void* addr, const size_t size)
 
 	*PUINT64(shmem) = UINT64(addr);
 
-	const auto status = drv.ctl(Ctl::READ_TARGET_MEM, uint32_t(size));
+	const auto status = drv.ctl(Ctl::READ_VIRTUAL, uint32_t(size));
 
 	if (!NT_SUCCESS(status))
 	{
@@ -56,7 +56,7 @@ bool vmem_driver::write_raw(void* addr, const size_t size)
 
 	*PUINT64(shmem) = UINT64(addr);
 
-	const auto status = drv.ctl(Ctl::WRITE_TARGET_MEM, uint32_t(size));
+	const auto status = drv.ctl(Ctl::WRITE_VIRTUAL, uint32_t(size));
 
 	if (!NT_SUCCESS(status))
 	{

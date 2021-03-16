@@ -8,11 +8,11 @@ typedef unsigned CTLTYPE;
 #define HOOKED_FN_NAME "OpenInputDesktop"
 #define HOOKED_FN_MODULE "User32.dll"
 
-constexpr UINT16 CTL_MAGIC = 0xFFAB; // Special calls for initialization
-constexpr UINT16 INIT_MAGIC = 0xFFAC;
+constexpr unsigned __int16 CTL_MAGIC = 0xFFAB; // Special calls for initialization
+constexpr unsigned __int16 INIT_MAGIC = 0xFFAC;
 
-typedef UINT64 (__fastcall *PHookFn)(UINT32, UINT16, UINT32);
-typedef UINT64 (__fastcall *_WmiTraceMessage)(UINT64, UINT64, UINT64, UINT64, UINT64);
+typedef unsigned __int64 (__fastcall *PHookFn)(unsigned __int32, unsigned __int16, unsigned __int32);
+typedef unsigned __int64 (__fastcall *_WmiTraceMessage)(unsigned __int64, unsigned __int64, unsigned __int64, unsigned __int64, unsigned __int64);
 
 constexpr size_t SHMEM_SIZE = 1024 * 4;
 
@@ -23,13 +23,13 @@ namespace Ctl
 	CTLCODE UNLOAD = 0x0F;
 	CTLCODE SET_TARGET = 0x20;
 	CTLCODE GET_BASE_ADDR = 0x21;
-	CTLCODE READ_TARGET_MEM = 0x30;
-	CTLCODE READ_PHYS_MEM = 0x31;
-	CTLCODE WRITE_TARGET_MEM = 0x40;
-	CTLCODE WRITE_PHYS_MEM = 0x41;
+	CTLCODE READ_VIRTUAL = 0x30;
+	CTLCODE READ_PHYSICAL = 0x31;
+	CTLCODE WRITE_VIRTUAL = 0x40;
+	CTLCODE WRITE_PHYSICAL = 0x41;
 }
 
-inline unsigned __int64 NT2CTL(NTSTATUS status)
+inline unsigned __int64 NT2CTL(unsigned long status)
 {
-	return CTLSTATUSBASE + ULONG(status);
+	return CTLSTATUSBASE + status;
 }

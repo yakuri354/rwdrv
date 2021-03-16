@@ -2,20 +2,20 @@
 
 NTSTATUS InitDriver(UINT32 a1, UINT32 a2, DriverState* driverState);
 NTSTATUS UnloadDriver(DriverState* state);
+NTSTATUS ReadVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead);
+NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead);
 
 NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState* driverState)
 {
-	PEPROCESS proc{};
-	NTSTATUS status;
 	SIZE_T bytes{};
-	PVOID pa;
-	PVOID va;
+	PVOID writeBuffer{};
+	PVOID addr{};
 
 	if (magic == INIT_MAGIC)
 	{
 		return InitDriver(ctlCode, param, driverState);
 	}
-
+	
 	if (magic == CTL_MAGIC)
 		switch (ctlCode)
 		{
@@ -38,79 +38,33 @@ NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState*
 
 		case Ctl::GET_BASE_ADDR:
 			log("Getting base address of process %u", param);
-			status = C_FN(PsLookupProcessByProcessId)(HANDLE(param), &proc);
-			if (!NT_SUCCESS(status))
-			{
-				log("Could not find process");
-				return STATUS_NOT_FOUND;
-			}
+			return GetProcessBase(driverState->TargetProcess, static_cast<PVOID*>(driverState->SharedMemory));
 
-			KeAttachProcess(proc);
-			va = C_FN(PsGetProcessSectionBaseAddress)(proc);
-			KeDetachProcess();
+		case Ctl::READ_PHYSICAL:
+			addr = *static_cast<PVOID*>(driverState->SharedMemory);
+			return Phys::ReadPhysicalAddress(addr, driverState->SharedMemory, SIZE_T(param), &bytes);
 
-			if (!va)
-			{
-				log("Could not find base");
-				return STATUS_UNSUCCESSFUL;
-			}
+		case Ctl::WRITE_PHYSICAL:
+			addr = *static_cast<PVOID*>(driverState->SharedMemory);
+			writeBuffer = PVOID(UINT64(driverState->SharedMemory) + sizeof(PVOID));
+			return Phys::WritePhysicalAddress(addr, writeBuffer, SIZE_T(param), &bytes);
 
-			*PUINT64(driverState->SharedMemory) = UINT64(va);
+		case Ctl::READ_VIRTUAL:
+			addr = *static_cast<PVOID*>(driverState->SharedMemory);
+#if USE_PHYSMEM
+			return Phys::ReadProcessMemory(driverState->TargetProcess, addr, driverState->SharedMemory, SIZE_T(param), &bytes);
+#else
+			return ReadVirtualMemory(driverState->TargetProcess, addr, driverState->SharedMemory, SIZE_T(param), &bytes);
+#endif
 
-			return STATUS_SUCCESS;
-
-		case Ctl::READ_PHYS_MEM:
-			pa = *static_cast<PVOID*>(driverState->SharedMemory);
-			return Phys::ReadPhysicalAddress(pa, driverState->SharedMemory, SIZE_T(param), &bytes);
-
-		case Ctl::WRITE_PHYS_MEM:
-			pa = *static_cast<PVOID*>(driverState->SharedMemory);
-			return Phys::WritePhysicalAddress(pa, driverState->SharedMemory, SIZE_T(param), &bytes);
-
-		case Ctl::READ_TARGET_MEM:
-			if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(driverState->TargetProcess, &proc))) return
-				STATUS_NOT_FOUND;
-
-			va = *static_cast<PVOID*>(driverState->SharedMemory);
-
-			status = C_FN(MmCopyVirtualMemory)(
-				proc,
-				va,
-				C_FN(IoGetCurrentProcess)(),
-				driverState->SharedMemory,
-				param,
-				UserMode,
-				&bytes
-			);
-
-			C_FN(ObfDereferenceObject)(proc);
-			
-			if (!NT_SUCCESS(status)) log("Va read at [0x%p] failed with status 0x%x", va, status);
-
-			return status;
-
-		case Ctl::WRITE_TARGET_MEM:
-			if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(driverState->TargetProcess, &proc))) return
-				STATUS_NOT_FOUND;
-
-			va = *reinterpret_cast<PVOID*>(UINT64(driverState->SharedMemory) + 8);
-
-			status = C_FN(MmCopyVirtualMemory)(
-				C_FN(IoGetCurrentProcess)(),
-				driverState->SharedMemory,
-				proc,
-				va,
-				param,
-				UserMode,
-				&bytes
-			);
-
-			C_FN(ObfDereferenceObject)(proc);
-
-			if (!NT_SUCCESS(status)) log("Va write at [0x%p] failed with status 0x%x", va, status);
-
-			return status;
-
+		case Ctl::WRITE_VIRTUAL:
+			addr = *static_cast<PVOID*>(driverState->SharedMemory);
+			writeBuffer = PVOID(UINT64(driverState->SharedMemory) + sizeof(PVOID));
+#if USE_PHYSMEM
+			return Phys::WriteProcessMemory(driverState->TargetProcess, addr, writeBuffer, SIZE_T(param), &bytes);
+#else
+			return WriteVirtualMemory(driverState->TargetProcess, addr, writeBuffer, SIZE_T(param), &bytes);
+#endif
 		default:
 			log("Invalid ctlCode received: 0x%x", ctlCode);
 			return STATUS_INVALID_PARAMETER;
@@ -160,6 +114,57 @@ NTSTATUS InitDriver(UINT32 a1, UINT32 a2, DriverState* driverState)
 	else log("Traces already cleaned, continuing");
 
 	return STATUS_SUCCESS;
+}
+
+NTSTATUS ReadVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead)
+{
+	PEPROCESS proc;
+	
+	if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(pid, &proc))) {
+		log("Process %llu not found", UINT64(pid));
+		return STATUS_NOT_FOUND;
+	}
+
+	const auto status = C_FN(MmCopyVirtualMemory)(
+		proc,
+		va,
+		C_FN(IoGetCurrentProcess)(),
+		buffer,
+		size,
+		UserMode,
+		bytesRead
+		);
+
+	C_FN(ObfDereferenceObject)(proc);
+
+	if (!NT_SUCCESS(status)) log("Va read at [0x%p] failed with status 0x%x", va, status);
+
+	return status;
+}
+
+NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead)
+{
+	PEPROCESS proc;
+	if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(pid, &proc))) {
+		log("Process %llu not found", UINT64(pid));
+		return STATUS_NOT_FOUND;
+	}
+
+	const auto status = C_FN(MmCopyVirtualMemory)(
+		C_FN(IoGetCurrentProcess)(),
+		buffer,
+		proc,
+		va,
+		size,
+		UserMode,
+		bytesRead
+		);
+
+	C_FN(ObfDereferenceObject)(proc);
+
+	if (!NT_SUCCESS(status)) log("Va write at [0x%p] failed with status 0x%x", va, status);
+
+	return status;
 }
 
 NTSTATUS UnloadDriver(DriverState* state)

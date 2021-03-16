@@ -1,7 +1,7 @@
 #pragma once
+#include "framework.h"
 #include "../loader/xorstr.hpp"
 #include "../loader/lazy_importer.hpp"
-#include <Windows.h>
 
 #ifdef _DEBUG
 #define logD log
