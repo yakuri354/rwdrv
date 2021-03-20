@@ -12,51 +12,77 @@ r6s::game::game(memory& _mem): mem(_mem)
 		throw std::exception("could not find r6s");
 	}
 
-	base = PVOID(mem.base(pid));
-	logD("Game object initialized");
+	base = mem.base(pid);
+	dbgLog("Game object initialized");
 }
 
 uintptr_t r6s::game::game_manager() const
 {
 	marker();
-	return mem.read<uintptr_t>(uint64_t(base) + (offsets::game_manager));
+	auto var = mem.read<uintptr_t>(base + offsets::game_manager);
+	var -= 0x51;
+	var = _rotl64(var, 0xC);
+	var -= 0x5Bi64;
+	return var;
 }
 
-uintptr_t r6s::game::glow_manager() const
+uintptr_t r6s::game::glow_manager() const // TODO update
 {
 	marker();
-	return mem.read<uintptr_t>(uintptr_t(base) + offsets::glow_manager);
+	return mem.read<uintptr_t>(base + offsets::glow_manager);
 }
 
 uintptr_t r6s::game::round_manager() const
 {
 	marker();
-	return mem.read<uintptr_t>(uint64_t(base) + (offsets::round_manager));
+	auto enc = mem.read<uintptr_t>(base + offsets::round_manager);
+	
 }
 
-uintptr_t r6s::game::entity_list() const
+uintptr_t r6s::game::profile_manager() const
 {
 	marker();
-	const auto gm = game_manager();
-	auto el = mem.read<uintptr_t>(gm + 0xE0);
-
-	el ^= 0x53;
-	el += 0xEEBD43B91E3D5D54;
-	el ^= 0x1FEC13843E78A654;
-
-	return el;
+	return mem.read<uint64_t>(base + offsets::profile_manager);
 }
+
+uintptr_t r6s::game::profile() const
+{
+	marker();
+	auto var = mem.read<uint64_t>(profile_manager() + 0x28);
+	var -= 6;
+	var = _rotl64(var, 1);
+	var ^= 0x1527809D30772AFC;
+	return var;
+}
+
+uintptr_t r6s::game::local_player() const
+{
+	marker();
+	auto enc = mem.read<uint64_t>(profile() + 0x58);
+	enc ^= 0x44CBF16C96879DE8;
+	enc += 0x87523D08B19E922B;
+	enc = _rotl64(enc, 0x23);
+	return enc;
+}
+
 
 uint32_t r6s::game::entity_count() const
 {
 	marker();
-	auto ec = mem.read<uintptr_t>(game_manager() + 0xE8);
+	auto count = mem.read<uintptr_t>(game_manager() + offsets::entity_count);
+	count -= 0x52;
+	count = ((count >> 29 | count << 35) ^ 0xC9B8147FF443FC5F) & 0x3FFFFFFF;
 
-	ec ^= 0x53;
-	ec += 0xEEBD43B91E3D5D54;
-	ec ^= 0x1FEC13843E78A654;
+	return static_cast<uint32_t>(count);
+}
 
-	return uint32_t(ec ^ 0x18C0000000);
+uint64_t r6s::game::entity_list() const
+{
+	auto list = mem.read<uintptr_t>(game_manager() + offsets::entity_list);
+	list -= 0x52;
+	list = ((list >> 29) | (list << 35)) ^ 0xC9B8147FF443FC5F;
+
+	return list;
 }
 
 uintptr_t r6s::game::entity_info(uintptr_t entity) const
@@ -68,12 +94,13 @@ uintptr_t r6s::game::entity_info(uintptr_t entity) const
 	return info ^ 0x84B4E3BD4F9014AF;
 }
 
-bool r6s::game::game_state() const
+uint32_t r6s::game::game_state() const
 {
 	marker();
-	const auto phase = mem.read<uint8_t>(round_manager() + 0x300);
-
-	return phase == 2 || phase == 3;
+	auto var = mem.read<uint32_t>(round_manager() + 0x90);
+	var += 0x4AF93094;
+	var ^= 0x9A96FFCF;
+	return _rotl(var, 7);
 }
 
 void r6s::game::cav_esp(bool active) const
@@ -107,8 +134,6 @@ void r6s::game::cav_esp(bool active) const
 				mem.write<uint8_t>(marker_icon + 0x220, 0x84);
 		}
 	}
-
-	return;
 }
 
 void r6s::game::glow(bool active) const

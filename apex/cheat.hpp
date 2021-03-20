@@ -1,5 +1,6 @@
 #pragma once
-#include "../umcontrol/hostframework.h"
+#include "../host/memory.hpp"
+#include "../host/util.hpp"
 
 namespace cheat
 {

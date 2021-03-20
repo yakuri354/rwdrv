@@ -14,7 +14,7 @@ constexpr unsigned __int16 INIT_MAGIC = 0xFFAC;
 typedef unsigned __int64 (__fastcall *PHookFn)(unsigned __int32, unsigned __int16, unsigned __int32);
 typedef unsigned __int64 (__fastcall *_WmiTraceMessage)(unsigned __int64, unsigned __int64, unsigned __int64, unsigned __int64, unsigned __int64);
 
-constexpr size_t SHMEM_SIZE = 1024 * 4;
+constexpr size_t SHMEM_SIZE = 0x5000;
 
 namespace Ctl
 {

@@ -1,5 +1,5 @@
 #pragma once
-#include "../umcontrol/memory.hpp"
+#include "../host/memory.hpp"
 #include "offsets.hpp"
 #include "math.hpp"
 

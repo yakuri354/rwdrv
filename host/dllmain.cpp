@@ -3,43 +3,41 @@
 #include "lazy_importer.hpp"
 #include "../rwdrv/comms.hpp"
 #include <iostream>
-#include "thread.hpp"
 #include "common.hpp"
-#include "../apex/cheat.h"
+#include "../apexbot/apexbot.hpp"
 #include "memory.hpp"
 
-PHookFn HookedFn = nullptr;
-
-__forceinline uint64_t DriverCall(uint32_t a1, uint16_t a2, uint32_t a3)
+struct host_state
 {
-	return HookedFn(a1, a2, a3);
-}
-
-__forceinline uint64_t DriverCtl(CTLTYPE controlCode, uint32_t additionalParam = 0)
-{
-	return DriverCall(controlCode, CTL_MAGIC, additionalParam);
-}
-
-struct State
-{
-	void* Memory;
-	DWORD MainThread;
+	void* memory;
+	PHookFn hooked_fn;
+	DWORD main_thread;
 };
 
 namespace g
 {
-	::State State = {};
+	host_state state = {};
 }
 
-bool InitDriver()
+__forceinline uint64_t driver_call(uint32_t a1, uint16_t a2, uint32_t a3)
 {
-	log("Initializing driver, Va [%p]", g::State.Memory);
+	return g::state.hooked_fn(a1, a2, a3);
+}
+
+__forceinline uint64_t driver_ctl(CTLTYPE controlCode, uint32_t additionalParam = 0)
+{
+	return driver_call(controlCode, CTL_MAGIC, additionalParam);
+}
+
+bool init_driver()
+{
+	log("Initializing driver, Va [%p]", g::state.memory);
 
 	LARGE_INTEGER lint;
 
-	lint.QuadPart = int64_t(g::State.Memory);
+	lint.QuadPart = int64_t(g::state.memory);
 
-	const auto status = DriverCall(lint.LowPart, INIT_MAGIC, lint.HighPart);
+	const auto status = driver_call(lint.LowPart, INIT_MAGIC, lint.HighPart);
 
 	if (!status || HANDLE(status) == INVALID_HANDLE_VALUE)
 	{
@@ -53,7 +51,7 @@ bool InitDriver()
 		return false;
 	}
 
-	if (*static_cast<uint16_t*>(g::State.Memory) != INIT_MAGIC)
+	if (*static_cast<uint16_t*>(g::state.memory) != INIT_MAGIC)
 	{
 		log("Probe write failed");
 		return false;
@@ -64,21 +62,21 @@ bool InitDriver()
 	return true;
 }
 
-DWORD WINAPI RealMain(void* param)
+DWORD WINAPI real_main(void* param)
 {
 	log("Starting initialization");
 
-	g::State.Memory = LI_FN(VirtualAlloc)(nullptr, SHMEM_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	g::state.memory = LI_FN(VirtualAlloc)(nullptr, SHMEM_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
-	if (g::State.Memory == nullptr)
+	if (g::state.memory == nullptr)
 	{
 		log("Allocating shared buffer failed");
 		return false;
 	}
 
-	log("Allocated shared buffer at [%p]", g::State.Memory);
+	log("Allocated shared buffer at [%p]", g::state.memory);
 
-	RtlZeroMemory(g::State.Memory, SHMEM_SIZE);
+	RtlZeroMemory(g::state.memory, SHMEM_SIZE);
 
 	log("Retrieving hooked fn");
 
@@ -97,26 +95,33 @@ DWORD WINAPI RealMain(void* param)
 		}
 	}
 
-	HookedFn = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
+	g::state.hooked_fn = LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
 
-	if (HookedFn == nullptr)
+	if (g::state.hooked_fn == nullptr)
 	{
 		log("Could not find function " HOOKED_FN_NAME "");
 		return -1;
 	}
 
-	log("Found hooked fn " HOOKED_FN_NAME " at [0x%p]", PVOID(HookedFn));
+	log("Found hooked fn " HOOKED_FN_NAME " at [0x%p]", PVOID(g::state.hooked_fn));
 
-	if (!InitDriver())
+	if (!init_driver())
 	{
 		log("Driver initialization failed");
 		return -1;
 	}
 
-	const driver_handle drv{ &DriverCtl };
-	vmem_driver mem{ g::State.Memory, SHMEM_SIZE, drv };
+	log("Starting cheat");
 
-	cheat::run(mem);
+	const driver_handle drv{ &driver_ctl };
+	vmem_driver mem{ g::state.memory, SHMEM_SIZE, drv };
+
+	hoster host{mem, [](char* str)
+	{
+		LI_FN(OutputDebugStringA)(str);
+	}};
+	
+	cheat(host);
 
 	return 0;
 }
@@ -129,7 +134,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	if (ul_reason_for_call == DLL_PROCESS_ATTACH)
 	{
 		log("Launching thread");
-		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(RealMain), nullptr, NULL, &g::State.MainThread);
+		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(real_main), nullptr, NULL, &g::state.main_thread);
 	}
 
 	return TRUE;

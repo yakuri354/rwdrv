@@ -7,8 +7,8 @@ namespace apex
 	{
 		constexpr auto entity_size = 0x42E0;
 
-		constexpr auto entity_list = 0x18DA338;  // cl_entitylist
-		constexpr auto local_entity = 0x1C898F8; // LocalPlayer
+		constexpr auto entity_list = 0x18da338; // cl_entitylist
+		constexpr auto local_player = 0x1C75558; // LocalPlayer
 
 		namespace entity
 		{
@@ -17,13 +17,13 @@ namespace apex
 
 		namespace player
 		{
-			constexpr auto team = 0x0450;			// m_iTeamNum
-			constexpr auto health = 0x0440;			// m_iHealth
-			constexpr auto name = 0x0589;			// m_iName
-			constexpr auto sig_name = 0x0580;		// m_iSignifierName
-			constexpr auto shield = 0x0170;			// m_shieldHealth
-			constexpr auto max_shield = 0x0174;		// m_shieldHealth +0x4
-			constexpr auto visible_time = 0x1A4C;	// m_visibletime
+			constexpr auto team = 0x0450; // m_iTeamNum
+			constexpr auto health = 0x0440; // m_iHealth
+			constexpr auto name = 0x0589; // m_iName
+			constexpr auto sig_name = 0x0580; // m_iSignifierName
+			constexpr auto shield = 0x0170; // m_shieldHealth
+			constexpr auto max_shield = 0x0174; // m_shieldHealth +0x4
+			constexpr auto visible_time = 0x1A4C; // m_visibletime
 		}
 
 		namespace glow

@@ -8,7 +8,7 @@ NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSI
 NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState* driverState)
 {
 	SIZE_T bytes{};
-	PVOID writeBuffer{};
+	PVOID buffer{};
 	PVOID addr{};
 
 	if (magic == INIT_MAGIC)
@@ -41,29 +41,31 @@ NTSTATUS ExecuteRequest(UINT32 ctlCode, UINT16 magic, UINT32 param, DriverState*
 			return GetProcessBase(driverState->TargetProcess, static_cast<PVOID*>(driverState->SharedMemory));
 
 		case Ctl::READ_PHYSICAL:
-			addr = *static_cast<PVOID*>(driverState->SharedMemory);
-			return Phys::ReadPhysicalAddress(addr, driverState->SharedMemory, SIZE_T(param), &bytes);
+			addr = *static_cast<PVOID*>(driverState->SharedMemory); // TODO Normal comms struct instead of this shitty thing
+			buffer = PVOID(UINT64(driverState->SharedMemory) + sizeof(PVOID));
+			return Phys::ReadPhysicalAddress(addr, buffer, SIZE_T(param), &bytes);
 
 		case Ctl::WRITE_PHYSICAL:
 			addr = *static_cast<PVOID*>(driverState->SharedMemory);
-			writeBuffer = PVOID(UINT64(driverState->SharedMemory) + sizeof(PVOID));
-			return Phys::WritePhysicalAddress(addr, writeBuffer, SIZE_T(param), &bytes);
+			buffer = PVOID(UINT64(driverState->SharedMemory) + sizeof(PVOID));
+			return Phys::WritePhysicalAddress(addr, buffer, SIZE_T(param), &bytes);
 
 		case Ctl::READ_VIRTUAL:
 			addr = *static_cast<PVOID*>(driverState->SharedMemory);
+			buffer = PVOID(UINT64(driverState->SharedMemory) + sizeof(PVOID));
 #if USE_PHYSMEM
-			return Phys::ReadProcessMemory(driverState->TargetProcess, addr, driverState->SharedMemory, SIZE_T(param), &bytes);
+			return Phys::ReadProcessMemory(driverState->TargetProcess, addr, writeBuffer, SIZE_T(param), &bytes);
 #else
-			return ReadVirtualMemory(driverState->TargetProcess, addr, driverState->SharedMemory, SIZE_T(param), &bytes);
+			return ReadVirtualMemory(driverState->TargetProcess, addr, buffer, SIZE_T(param), &bytes);
 #endif
 
 		case Ctl::WRITE_VIRTUAL:
 			addr = *static_cast<PVOID*>(driverState->SharedMemory);
-			writeBuffer = PVOID(UINT64(driverState->SharedMemory) + sizeof(PVOID));
+			buffer = PVOID(UINT64(driverState->SharedMemory) + sizeof(PVOID));
 #if USE_PHYSMEM
 			return Phys::WriteProcessMemory(driverState->TargetProcess, addr, writeBuffer, SIZE_T(param), &bytes);
 #else
-			return WriteVirtualMemory(driverState->TargetProcess, addr, writeBuffer, SIZE_T(param), &bytes);
+			return WriteVirtualMemory(driverState->TargetProcess, addr, buffer, SIZE_T(param), &bytes);
 #endif
 		default:
 			log("Invalid ctlCode received: 0x%x", ctlCode);

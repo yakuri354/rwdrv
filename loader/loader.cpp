@@ -2,12 +2,13 @@
 #include <iostream>
 #include <Windows.h>
 #include <locale>
+#include <codecvt>
 #include <string>
 #include "../kdmapper/kdmapper.hpp"
 #include "xorstr.hpp"
 #include "ShlObj.h"
 #include "../rwdrv/comms.hpp"
-#include "../umcontrol/lazy_importer.hpp"
+#include "../host/lazy_importer.hpp"
 
 DWORD GetProcessByNameW(std::wstring name)
 {
@@ -130,7 +131,7 @@ std::wstring GetLastErrorAsStringW()
 	return message;
 }
 
-bool InjectDll()
+bool InjectDll(std::wstring *process)
 {
 	// TODO Embed encrypted dll in loader
 
@@ -154,13 +155,18 @@ bool InjectDll()
 	// 	std::cout << xs("[!] Error while creating process: ") << GetLastErrorAsString() << std::endl;
 	// 	return false;
 	// }
-
+	std::wstring* proc;
 	std::wstring name{};
-	std::cout << "[?] Where to host the dll: ";
-	std::wcin >> name;
+	
+	if (process == nullptr) {
+		std::cout << "[?] Where to host the dll: ";
+		std::wcin >> name;
+		proc = &name;
+	}
+	else proc = process;
 
-	const auto hProc = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_VM_WRITE | PROCESS_HEAP_SEG_ALLOC, false,
-	                               GetProcessByNameW(name));
+	auto* const hProc = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_VM_WRITE | PROCESS_HEAP_SEG_ALLOC, false,
+	                                GetProcessByNameW(*proc));
 
 	if (hProc == nullptr || hProc == INVALID_HANDLE_VALUE)
 	{
@@ -170,10 +176,10 @@ bool InjectDll()
 
 	std::cout << xs("[>] Injecting DLL with LoadLibrary") << std::endl;
 
-	char tempPath[MAX_PATH] = {};
+	char temp_path[MAX_PATH] = {};
 
-	const auto pathSize = GetTempPathA(MAX_PATH, tempPath);
-	if (!pathSize)
+	const auto path_size = GetTempPathA(MAX_PATH, temp_path);
+	if (!path_size)
 	{
 		std::cout << xs("[!] Failed to get temp path: ") << GetLastErrorAsString() << std::endl;
 		// CloseHandle(pInfo.hThread);
@@ -183,15 +189,15 @@ bool InjectDll()
 
 	const auto temp = std::filesystem::temp_directory_path();
 
-	const auto dllName = GenRandStr(10) + ".dll";
+	const auto dll_name = GenRandStr(10) + ".dll";
 
-	const auto realDllPath = temp / dllName;
+	const auto real_dll_path = temp / dll_name;
 
-	copy(std::filesystem::path(ExePath()) / xs("host.dll"), realDllPath);
+	copy(std::filesystem::path(ExePath()) / xs("host.dll"), real_dll_path);
 
 
-	const auto memory = VirtualAllocEx(hProc, nullptr,
-	                                   realDllPath.native().size() * 2, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	auto* const memory = VirtualAllocEx(hProc, nullptr,
+	                                    real_dll_path.native().size() * 2, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	if (!memory)
 	{
 		std::cout << xs("[!] Failed to allocate path in target process: ") << GetLastErrorAsString() << std::endl;
@@ -200,9 +206,7 @@ bool InjectDll()
 		return false;
 	}
 
-	// FUCK WIDE STRINGS
-
-	if (!WriteProcessMemory(hProc, memory, realDllPath.c_str(), realDllPath.native().size() * 2, nullptr))
+	if (!WriteProcessMemory(hProc, memory, real_dll_path.c_str(), real_dll_path.native().size() * 2, nullptr))
 	{
 		std::cout << xs("[!] Failed to copy path into target process: ") << GetLastErrorAsString() << std::endl;
 		// CloseHandle(pInfo.hThread);
@@ -211,7 +215,7 @@ bool InjectDll()
 	}
 
 
-	auto hThread = CreateRemoteThread(
+	const auto h_thread = CreateRemoteThread(
 		hProc,
 		nullptr,
 		NULL,
@@ -221,7 +225,7 @@ bool InjectDll()
 		nullptr
 	);
 
-	if (!hThread || hThread == INVALID_HANDLE_VALUE)
+	if (!h_thread || h_thread == INVALID_HANDLE_VALUE)
 	{
 		std::cout << xs("[!] Failed to launch LoadLibrary routine: ") << GetLastErrorAsString() << std::endl;
 		// CloseHandle(pInfo.hThread);
@@ -229,20 +233,20 @@ bool InjectDll()
 		return false;
 	}
 
-	WaitForSingleObject(hThread, INFINITE);
+	WaitForSingleObject(h_thread, INFINITE);
 	DWORD exitCode;
-	if (!GetExitCodeThread(hThread, &exitCode) || exitCode == 0)
+	if (!GetExitCodeThread(h_thread, &exitCode) || exitCode == 0)
 	{
 		std::cout << xs("[!] LoadLibrary failed: ") << std::hex << exitCode << std::dec << std::endl;
 		// CloseHandle(pInfo.hThread);
 		CloseHandle(hProc);
-		CloseHandle(hThread);
+		CloseHandle(h_thread);
 		return false;
 	}
 
 	std::cout << xs("[+] Successfully injected usermode controller dll") << std::endl;
 
-	CloseHandle(hThread);
+	CloseHandle(h_thread);
 	// CloseHandle(pInfo.hThread);
 	CloseHandle(hProc);
 	return true;
@@ -297,7 +301,7 @@ bool check_serivice()
 		return false;
 	}
 
-	const auto dummy = EnumServicesStatusExW(
+	(void) EnumServicesStatusExW(
 		sc_handle,
 		SC_ENUM_PROCESS_INFO,
 		SERVICE_WIN32,
@@ -309,8 +313,6 @@ bool check_serivice()
 		&resumeHandle,
 		nullptr
 	);
-
-	assert(!dummy);
 
 	if (GetLastError() != ERROR_MORE_DATA)
 	{
@@ -369,7 +371,7 @@ PHookFn get_hook_fn()
 	return LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
 }
 
-int load(bool forceReloadDrv = false)
+int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 {
 	std::cout << xs("[>] Loading rwdrv") << std::endl;
 
@@ -408,7 +410,7 @@ int load(bool forceReloadDrv = false)
 		return 1;
 	}
 
-	if (!InjectDll())
+	if (!InjectDll(process))
 	{
 		std::cout << xs("[-] Failed to load usermode dll component") << std::endl;
 		return 1;
@@ -421,7 +423,25 @@ int load(bool forceReloadDrv = false)
 
 int main(int argc, char* argv[])
 {
-	const auto result = load(argc >= 2 && !strcmp(argv[1], xs("--forcereload")));
+	bool force_reload = false;
+	std::wstring proc;
+	std::wstring* p_proc = nullptr;
+	
+	for (auto i = 0; i < argc; i++)
+	{
+		if (!strcmp(argv[i], xs("--forcereload")))
+		{
+			force_reload = true;
+		} else if (!strcmp(argv[i], xs("--process")) && argc >= i + 2)
+		{
+			std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter{};
+			proc = converter.from_bytes(argv[i + 1]);
+			p_proc = &proc;
+			i++;
+		}
+	}
+
+	const auto result = load(force_reload, p_proc);
 
 	if (GetConsoleProcessList(nullptr, 0) == 1)
 	{

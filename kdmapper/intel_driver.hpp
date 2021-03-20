@@ -3,7 +3,6 @@
 #include <iostream>
 #include <string>
 #include <filesystem>
-#include <atlstr.h>
 
 #include "intel_driver_resource.hpp"
 #include "service.hpp"

@@ -4,6 +4,7 @@
 vmem_driver::vmem_driver(void* _shmem, size_t _shmem_size, const driver_handle driver):
 	shmem(_shmem), shmem_size(_shmem_size), drv(driver)
 {
+	log("Initializing memory");
 }
 
 uintptr_t vmem_driver::base(uint32_t pid)
@@ -29,7 +30,7 @@ bool vmem_driver::read_raw(void* addr, const size_t size)
 {
 	if (size > shmem_size - 8 || size > UINT32_MAX)
 	{
-		log("Read size too big");
+		log("Read size too big: 0x%zx, max 0x%zx", size, shmem_size);
 		return false;
 	}
 
@@ -39,7 +40,7 @@ bool vmem_driver::read_raw(void* addr, const size_t size)
 
 	if (!NT_SUCCESS(status))
 	{
-		log("Read failed: 0x%x", NTSTATUS(status));
+		log("Read at [0x%p] failed: 0x%x", addr, NTSTATUS(status));
 		return false;
 	}
 
@@ -60,7 +61,7 @@ bool vmem_driver::write_raw(void* addr, const size_t size)
 
 	if (!NT_SUCCESS(status))
 	{
-		log("Write failed: 0x%x", NTSTATUS(status));
+		log("Write at [0x%p] failed: 0x%x", addr, NTSTATUS(status));
 		return false;
 	}
 

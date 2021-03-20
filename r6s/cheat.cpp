@@ -1,6 +1,6 @@
 #include "cheat.hpp"
 
-void cheat::cheat_loop(memory& mem)
+void cheat::run(memory& mem)
 {
 	log("Starting cheat loop");
 

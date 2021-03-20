@@ -18,16 +18,16 @@
     <ClInclude Include="apex.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="entity.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="offsets.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="math.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cheat.h">
+    <ClInclude Include="cheat.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="entity.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,4 +1,4 @@
-#include "entity.h"
+#include "entity.hpp"
 
 apex::entity::entity(uintptr_t pointer, memory& mem): ptr(pointer), buffer{  }
 {

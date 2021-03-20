@@ -4,10 +4,10 @@
 #include "../loader/lazy_importer.hpp"
 
 #ifdef _DEBUG
-#define logD log
+#define dbgLog log
 #define marker() LI_FN(OutputDebugStringA)("[umc] " __FUNCTION__ "\n")
 #else
-#define logD(...)
+#define dbgLog(...)
 #define marker(...) 
 #endif
 

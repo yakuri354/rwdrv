@@ -15,16 +15,16 @@ NTSTATUS Clear::CleanupMiscTraces(DriverState *driverState)
 	// 	log(skCrypt("[rwdrv] Spoofing disk serials failed");
 	// 	return status;
 	// }
-	
-	if (driverState->ImageSize >= 0x1000)
-	{
-		status = ClearSystemBigPoolInfo(driverState->BaseAddress);
-		if (!NT_SUCCESS(status))
-		{
-			log("Clearing BigPoolInfo failed");
-			return status;
-		}
-	}
+	// TODO Needs debugging
+	// if (driverState->ImageSize >= 0x1000)
+	// {
+	// 	status = ClearSystemBigPoolInfo(driverState->BaseAddress);
+	// 	if (!NT_SUCCESS(status))
+	// 	{
+	// 		log("Clearing BigPoolInfo failed");
+	// 		return status;
+	// 	}
+	// }
 	status = ClearPfnEntry(driverState->BaseAddress, driverState->ImageSize);
 	if (!NT_SUCCESS(status))
 	{
@@ -220,7 +220,7 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr) // TODO Fix
 	{
 		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
 		{
-			log("Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [%xll]",
+			log("Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [0x%llx]",
 			    PVOID(poolBigPageTable[i].Va),
 			    poolBigPageTable[i].Key,
 			    poolBigPageTable[i].NumberOfBytes);

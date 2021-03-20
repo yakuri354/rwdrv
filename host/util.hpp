@@ -36,4 +36,14 @@ namespace util
 		CloseHandle(proc_snapshot);
 		return 0;
 	}
+
+	template <class T>
+	constexpr
+	std::string_view
+	type_name()
+	{
+		using namespace std;
+		const string_view p = __FUNCSIG__;
+		return string_view(p.data() + 84, p.size() - 84 - 7);
+	}
 }

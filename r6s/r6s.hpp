@@ -4,43 +4,36 @@
 #include "util.h"
 
 namespace r6s
-{	
-	namespace offsets
+{
+	namespace offsets // TODO
 	{
-		constexpr auto game_manager = 0x6E444A0;
-		constexpr auto glow_manager = 0x5E10620;
-		constexpr auto fov_manager = 0xE39BCCD3;
-		constexpr auto profile_manager = 0x5E380E0;
-		constexpr auto network_manager = 0x2B1319B;
-		constexpr auto round_manager = 0x70D6810;
+		constexpr auto game_manager = 0x7154CF0;
+		constexpr auto profile_manager = 0x715C5A8;
+		constexpr auto round_manager = 0x732D020;
 
-		constexpr auto content_manager = 0x5E20A90;
-		constexpr auto vt_marker = 0x3938bb0;
-		constexpr auto noclip_manager = 0x5AFC450;
-		constexpr auto enviroment_manager = 0x5E10620;
-		constexpr auto spoof_spectate_manager = 0x6D1E278;
-
-		constexpr auto cav = 0x220;
-		constexpr auto rgb = 0xD0;
-		constexpr auto spoof = 0x5D;
+		constexpr auto entity_list = 0xE0;
+		constexpr auto entity_count = 0xE8;
 	}
 
 	class game
 	{
-		[[nodiscard]] uintptr_t game_manager() const;
-		[[nodiscard]] uintptr_t glow_manager() const;
-		[[nodiscard]] uintptr_t round_manager() const;
-		[[nodiscard]] uintptr_t entity_list() const;
-		[[nodiscard]] uint32_t entity_count() const;
-		[[nodiscard]] uintptr_t entity_info(uintptr_t entity) const;
-		[[nodiscard]] bool game_state() const;
+		uintptr_t game_manager() const;
+		uintptr_t glow_manager() const;
+		uintptr_t round_manager() const;
+		uintptr_t entity_list() const;
+		uintptr_t profile_manager() const;
+		uintptr_t profile() const;
+		uintptr_t local_player() const;
+		uint32_t entity_count() const;
+		uintptr_t entity_info(uintptr_t entity) const;
+		uint32_t game_state() const;
 
 		memory& mem;
-		void* base;
+		uintptr_t base;
 
 	public:
 		explicit game(memory& _mem);
-		
+
 		void cav_esp(bool active) const;
 		void glow(bool active) const;
 	};

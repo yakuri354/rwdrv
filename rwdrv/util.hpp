@@ -5,6 +5,7 @@
 
 __forceinline NTSTATUS GetProcessBase(HANDLE pid, OUT PVOID *address)
 {
+	KAPC_STATE state;
 	PEPROCESS proc;
 
 	const auto status = C_FN(PsLookupProcessByProcessId)(pid, &proc);
@@ -14,8 +15,12 @@ __forceinline NTSTATUS GetProcessBase(HANDLE pid, OUT PVOID *address)
 		log("Could not find process");
 		return STATUS_NOT_FOUND;
 	}
+	
+	C_FN(KeStackAttachProcess)(proc, &state);
+	
+	auto* va = C_FN(PsGetProcessSectionBaseAddress)(proc); // TODO No attach
 
-	auto* va = C_FN(PsGetProcessSectionBaseAddress)(proc);
+	C_FN(KeUnstackDetachProcess)(&state);
 
 	if (!va)
 	{

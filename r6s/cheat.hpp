@@ -5,5 +5,5 @@
 
 namespace cheat
 {
-	void cheat_loop(memory& mem);
+	void run(memory& mem);
 }
