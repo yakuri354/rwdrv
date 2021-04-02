@@ -20,6 +20,13 @@ constexpr bool NT_SUCCESS(NTSTATUS status)
 	return status >= 0;
 }
 
+
+template <typename T>
+__forceinline auto cmPtr(UINT32 high, UINT32 low)
+{
+	return reinterpret_cast<T*>(UINT64(high) << 32 | low);
+}
+
 struct HookData
 {
 	PUINT64 PtrLoc;
@@ -28,15 +35,12 @@ struct HookData
 
 struct DriverState
 {
-	bool Initialized;
+	bool TracesCleaned;
 	PVOID BaseAddress;
 	ULONG ImageSize;
 	HookData Syscall;
 	HookData Wmi;
 	PDRIVER_DISPATCH OriginalDiskDispatchFn;
-	PVOID SharedMemory;
-
-	HANDLE TargetProcess; // PID
 };
 
 #ifdef DEBUG

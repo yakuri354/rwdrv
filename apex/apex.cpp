@@ -1,6 +1,6 @@
 #include "apex.hpp"
 
-apex::game::game(memory& mem): memory_(mem), base(0)
+apex::game::game(provider& mem): memory_(mem), base(0)
 {
 	const auto name = std::wstring(apex::name);
 	const auto pid = util::process_id(name);

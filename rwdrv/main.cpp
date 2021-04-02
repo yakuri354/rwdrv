@@ -1,13 +1,13 @@
 #define NO_DDK
 #include <ntifs.h>
 #include "common.hpp"
-#include "clear.hpp"
 #include "search.hpp"
 #include "skcrypt.hpp"
 #include "comms.hpp"
 #include "intrin.h"
 #include "exec.hpp"
 
+static_assert(sizeof(void*) == 8, "32 bit build is not supported");
 
 PVOID g::KernelBase;
 
@@ -16,19 +16,21 @@ namespace g
 	::DriverState DriverState{};
 }
 
-UINT64 __fastcall HookControl(UINT64 ctlCode, UINT64 a2, UINT64 param, UINT16 magic, UINT64 a5)
+UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64 a5)
 {
-	if (magic == CTL_MAGIC || magic == INIT_MAGIC)
+	if (a4 == CTL_MAGIC)
 	{
-		return NT2CTL(ExecuteRequest(UINT32(ctlCode), magic, UINT32(param), &g::DriverState));
+		return NT2CTL(
+			ExecuteRequest(cmPtr<Control>(a1, a3), &g::DriverState)
+		);
 	}
 
-	if (ctlCode >= 0xffff000000000000u)
+	if (a1 >= 0xffff000000000000u)
 	{
-		return _WmiTraceMessage(g::DriverState.Wmi.OrigPtr)(ctlCode, a2, param, magic, a5);
+		return _WmiTraceMessage(g::DriverState.Wmi.OrigPtr)(a1, a2, a3, a4, a5);
 	}
 
-	return PHookFn(g::DriverState.Syscall.OrigPtr)(UINT32(ctlCode), magic, UINT32(param));
+	return PHookFn(g::DriverState.Syscall.OrigPtr)(UINT32(a1), a4, UINT32(a3));
 }
 
 

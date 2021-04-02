@@ -48,13 +48,12 @@ std::string GenRandStr(const int len)
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"abcdefghijklmnopqrstuvwxyz";
 
-	srand(static_cast<unsigned>(time(nullptr)) * _getpid());
+	srand(static_cast<unsigned>(time(nullptr)) * GetCurrentProcessId());
 
 	tmp_s.reserve(len);
 
 	for (auto i = 0; i < len; ++i)
 		tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
-
 
 	return tmp_s;
 }
@@ -381,7 +380,7 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 		return 1;
 	}
 
-	srand(static_cast<unsigned>(time(nullptr)) * _getpid());
+	srand(static_cast<unsigned>(time(nullptr)) * GetCurrentProcessId());
 
 	if (!check_serivice())
 	{

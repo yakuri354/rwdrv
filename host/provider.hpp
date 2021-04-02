@@ -4,13 +4,14 @@
 #include "common.hpp"
 #include "../rwdrv/comms.hpp"
 
-typedef uint64_t (drv_ctl_t)(CTLTYPE ctl_code, uint32_t param);
+typedef uint64_t (drv_ctl_t)(uint32_t a1, uint32_t a2);	
+typedef MEMORY_BASIC_INFORMATION mem_info;
 
-struct vmem_driver;
+struct driver;
 
 struct driver_handle
 {
-	friend vmem_driver;
+	friend driver;
 
 	driver_handle(drv_ctl_t* p_ctl) : ctl(p_ctl)
 	{
@@ -20,12 +21,13 @@ private:
 	drv_ctl_t* ctl;
 };
 
-struct memory
+struct provider
 {
 	virtual bool attach(uint32_t pid) = 0;
-	virtual uintptr_t base(uint32_t pid) = 0;
-	virtual bool read_raw(void* addr, size_t size) = 0;
-	virtual bool write_raw(void* addr, size_t size) = 0;
+	virtual uintptr_t base() = 0;
+	virtual mem_info virtual_query(void* addr) = 0;
+	virtual bool read_raw(void* addr, void* buf, size_t size) = 0;
+	virtual bool write_raw(void* addr, void* buf, size_t size) = 0;
 
 	template <typename T>
 	T read(void* addr);
@@ -38,64 +40,54 @@ struct memory
 
 	template <typename T>
 	void write(uintptr_t addr, const T& value);
-
-	virtual std::pair<void*, size_t> buf() = 0;
-	virtual ~memory() = default;
+	
+	virtual ~provider() = default;
 };
 
-struct vmem_driver : memory
+struct driver : provider
 {
-	vmem_driver(void* shmem, size_t shmem_size, driver_handle driver);
+	driver(const driver_handle& driver);
 
-	uintptr_t base(uint32_t pid) override;
+	uintptr_t base() override;
+	mem_info virtual_query(void* addr) override;
 	bool attach(uint32_t pid) override;
-	bool read_raw(void* addr, size_t size) override;
-	bool write_raw(void* addr, size_t size) override;
-	std::pair<void*, size_t> buf() override;
+	bool read_raw(void* addr, void* buf, size_t size) override;
+	bool write_raw(void* addr, void* buf, size_t size) override;
 
 private:
-	void* shmem;
-	size_t shmem_size;
-	driver_handle drv;
+	uint64_t send_req()
+	{
+		return drv.ctl(uint32_t(uint64_t(&ctl) >> 32), uint32_t(&ctl));
+	}
+
+	const driver_handle& drv;
+	Control ctl;
 };
 
 template <typename T>
-T memory::read(void* addr)
+T provider::read(void* addr)
 {
-	auto [buffer, size] = buf();
-
-	if (sizeof(T) > size)
-	{
-		log("Value too big");
-		throw std::exception("value too big");
-	}
-
-	if (!read_raw(addr, sizeof(T)))
+	T local;
+	
+	if (!read_raw(addr, &local, sizeof(T)))
 	{
 		log("Value read failed");
 		throw std::exception("read failed");
 	}
 
-	return *static_cast<T*>(buffer);
+	return local;
 }
 
 template <typename T>
-T memory::read(const uintptr_t addr)
+T provider::read(const uintptr_t addr)
 {
 	return read<T>(PVOID(addr));
 }
 
 template <typename T>
-void memory::write(void* addr, const T& value)
+void provider::write(void* addr, const T& value)
 {
-	auto [buffer, size] = buf();
-
-	if (sizeof(T) > size)
-	{
-		log("Value too big");
-		throw std::exception("value too big");
-	}
-
+#ifdef _DEBUG
 	fmt::memory_buffer out;
 	if constexpr (std::is_same<T, int>::value
 		|| std::is_same<T, uintptr_t>::value
@@ -108,10 +100,9 @@ void memory::write(void* addr, const T& value)
 		format_to(out, "\t\tWriting a {} to {}\n", typeid(T).name(), addr);
 	}
 	LI_FN(OutputDebugStringA)(out.data());
+#endif
 
-	memcpy(buffer, &value, sizeof(T));
-
-	if (!write_raw(addr, sizeof(T)))
+	if (!write_raw(addr, &value, sizeof(T)))
 	{
 		log("Value write failed");
 		throw std::exception("write failed");
@@ -127,7 +118,7 @@ void memory::write(void* addr, const T& value)
 }
 
 template <typename T>
-void memory::write(uintptr_t addr, const T& value)
+void provider::write(uintptr_t addr, const T& value)
 {
 	write(PVOID(addr), value);
 }

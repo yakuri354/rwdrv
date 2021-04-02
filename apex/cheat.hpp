@@ -1,9 +1,9 @@
 #pragma once
-#include "../host/memory.hpp"
+#include "../host/provider.hpp"
 #include "../host/util.hpp"
 
 namespace cheat
 {
-	void run(memory& mem);
+	void run(provider& mem);
 }
 

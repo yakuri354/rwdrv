@@ -5,11 +5,10 @@
 #include <iostream>
 #include "common.hpp"
 #include "../apexbot/apexbot.hpp"
-#include "memory.hpp"
+#include "provider.hpp"
 
 struct host_state
 {
-	void* memory;
 	PHookFn hooked_fn;
 	DWORD main_thread;
 };
@@ -29,35 +28,32 @@ __forceinline uint64_t driver_ctl(CTLTYPE controlCode, uint32_t additionalParam 
 	return driver_call(controlCode, CTL_MAGIC, additionalParam);
 }
 
-bool init_driver()
+bool cleanup()
 {
-	log("Initializing driver, Va [%p]", g::state.memory);
+	log("Clearing loading traces");
 
-	LARGE_INTEGER lint;
+	Control ctl{};
+	ctl.CtlCode = Ctl::CLEAN;
 
-	lint.QuadPart = int64_t(g::state.memory);
+	LARGE_INTEGER lint{};
 
-	const auto status = driver_call(lint.LowPart, INIT_MAGIC, lint.HighPart);
+	lint.QuadPart = UINT64(&ctl);
 
-	if (!status || HANDLE(status) == INVALID_HANDLE_VALUE)
+	const auto status = driver_ctl(lint.HighPart, lint.LowPart);
+
+	if ((status >> 32) << 32 != CTLSTATUSBASE)
 	{
-		log("Init call returned invalid value. Looks like the hook does not work, check kernel logs");
+		log("Clean call returned invalid value. Looks like the hook does not work, check kernel logs");
 		return false;
 	}
 
 	if (!NT_SUCCESS(status))
 	{
-		log("Init call failed with status 0x%llx", status);
+		log("Clean call failed with status 0x%llx", status);
 		return false;
 	}
 
-	if (*static_cast<uint16_t*>(g::state.memory) != INIT_MAGIC)
-	{
-		log("Probe write failed");
-		return false;
-	}
-
-	log("Driver successfully initialized");
+	log("Traces successfully cleaned");
 
 	return true;
 }
@@ -65,18 +61,6 @@ bool init_driver()
 DWORD WINAPI real_main(void* param)
 {
 	log("Starting initialization");
-
-	g::state.memory = LI_FN(VirtualAlloc)(nullptr, SHMEM_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-
-	if (g::state.memory == nullptr)
-	{
-		log("Allocating shared buffer failed");
-		return false;
-	}
-
-	log("Allocated shared buffer at [%p]", g::state.memory);
-
-	RtlZeroMemory(g::state.memory, SHMEM_SIZE);
 
 	log("Retrieving hooked fn");
 
@@ -105,23 +89,24 @@ DWORD WINAPI real_main(void* param)
 
 	log("Found hooked fn " HOOKED_FN_NAME " at [0x%p]", PVOID(g::state.hooked_fn));
 
-	if (!init_driver())
+	if (!cleanup())
 	{
-		log("Driver initialization failed");
+		log("Cleanup failed");
 		return -1;
 	}
 
 	log("Starting cheat");
 
-	const driver_handle drv{ &driver_ctl };
-	vmem_driver mem{ g::state.memory, SHMEM_SIZE, drv };
+	driver mem{driver_handle{&driver_ctl}};
 
-	hoster host{mem, [](char* str)
-	{
-		LI_FN(OutputDebugStringA)(str);
-	}};
-	
-	cheat(host);
+	hoster host{
+		mem, [](char* str)
+		{
+			LI_FN(OutputDebugStringA)(str);
+		}
+	};
+
+	cheat(host); // TODO cheat
 
 	return 0;
 }
