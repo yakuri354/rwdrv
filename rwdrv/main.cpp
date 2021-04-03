@@ -21,7 +21,7 @@ UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64
 	if (a4 == CTL_MAGIC)
 	{
 		return NT2CTL(
-			ExecuteRequest(cmPtr<Control>(a1, a3), &g::DriverState)
+			ExecuteRequest(cmPtr<Control>(UINT32(a1), UINT32(a3)), &g::DriverState)
 		);
 	}
 

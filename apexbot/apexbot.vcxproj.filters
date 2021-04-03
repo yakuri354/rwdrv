@@ -98,5 +98,8 @@
     <ClCompile Include="scripts.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="state.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

@@ -57,7 +57,9 @@ struct driver : provider
 private:
 	uint64_t send_req()
 	{
-		return drv.ctl(uint32_t(uint64_t(&ctl) >> 32), uint32_t(&ctl));
+#pragma warning(suppress : 4311)
+#pragma warning(suppress : 4302)
+		return drv.ctl(uint32_t(uint64_t(&ctl) >> 32), uint32_t(&ctl));  // NOLINT(clang-diagnostic-pointer-to-int-cast)
 	}
 
 	const driver_handle& drv;

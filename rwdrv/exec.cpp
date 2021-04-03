@@ -33,7 +33,7 @@ NTSTATUS ExecuteRequest(Control* ctl, DriverState* driverState)
 		return C_FN(MmCopyMemory)(ctl->Target, *reinterpret_cast<MM_COPY_ADDRESS*>(&ctl->Source),
 		                          ctl->Size, MM_COPY_MEMORY_PHYSICAL, &ctl->Result);
 	case Ctl::VIRT_QUERY:
-		return NtQueryVirtualMemory(HANDLE(ctl->Pid), ctl->Source, MemoryBasicInformation,
+		return C_FN(ZwQueryVirtualMemory)(HANDLE(ctl->Pid), ctl->Source, MemoryBasicInformation,
 		                            ctl->Target, sizeof(MEMORY_BASIC_INFORMATION), &ctl->Result);
 	case Ctl::VIRT_READ:
 #if USE_PHYSMEM

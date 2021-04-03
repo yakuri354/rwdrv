@@ -44,5 +44,5 @@ inline unsigned __int64 NT2CTL(unsigned long status)
 inline bool CTL_SUCCESS(CTLSTATUSTYPE status)
 {
 	// Reset last 32 bit and check if status is valid
-	return (status >> 32) << 32 == CTLSTATUSBASE && NT_SUCCESS(status);
+	return (status >> 32) << 32 == CTLSTATUSBASE && int(status) >= 0;
 }
