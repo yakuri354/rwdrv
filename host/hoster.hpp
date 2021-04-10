@@ -6,7 +6,7 @@
 
 struct hoster
 {
-	using logger_t = void __fastcall(char*);
+	using logger_t = void __fastcall(const char*);
 
 	explicit hoster(provider& _mem, logger_t *_logger): mem(_mem), logger(_logger) {}
 

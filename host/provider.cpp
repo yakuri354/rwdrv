@@ -61,10 +61,10 @@ bool driver::read_raw(void* addr, void* buf, const size_t size) // TODO Unified 
 	return true;
 }
 
-bool driver::write_raw(void* addr, void* buf, const size_t size)
+bool driver::write_raw(void* addr, const void* buf, const size_t size)
 {
 	ctl.CtlCode = Ctl::VIRT_WRITE;
-	ctl.Source = buf;
+	ctl.Source = const_cast<void*>(buf);
 	ctl.Target = addr;
 	ctl.Size = size;
 

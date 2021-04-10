@@ -16,15 +16,15 @@ NTSTATUS Clear::CleanupMiscTraces(DriverState *driverState)
 	// 	return status;
 	// }
 	// TODO Needs debugging
-	// if (driverState->ImageSize >= 0x1000)
-	// {
-	// 	status = ClearSystemBigPoolInfo(driverState->BaseAddress);
-	// 	if (!NT_SUCCESS(status))
-	// 	{
-	// 		log("Clearing BigPoolInfo failed");
-	// 		return status;
-	// 	}
-	// }
+	if (driverState->ImageSize >= 0x1000)
+	{
+		status = ClearSystemBigPoolInfo(driverState->BaseAddress);
+		if (!NT_SUCCESS(status))
+		{
+			log("Clearing BigPoolInfo failed");
+			return status;
+		}
+	}
 	status = ClearPfnEntry(driverState->BaseAddress, driverState->ImageSize);
 	if (!NT_SUCCESS(status))
 	{

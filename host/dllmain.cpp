@@ -1,10 +1,12 @@
 ﻿// dllmain.cpp : Определяет точку входа для приложения DLL.
 #include "pch.h"
+#include <random>
 #include "lazy_importer.hpp"
 #include "../rwdrv/comms.hpp"
 #include <iostream>
 #include "common.hpp"
-#include "../apexbot/apexbot.hpp"
+// #include "../apexbot/apexbot.hpp"
+#include "test.h"
 #include "provider.hpp"
 
 struct host_state
@@ -41,6 +43,7 @@ bool cleanup()
 
 	const auto status = driver_ctl(lint.HighPart, lint.LowPart);
 
+	// Reset last 32 bytes
 	if ((status >> 32) << 32 != CTLSTATUSBASE)
 	{
 		log("Clean call returned invalid value. Looks like the hook does not work, check kernel logs");
@@ -100,13 +103,14 @@ DWORD WINAPI real_main(void* param)
 	driver mem{driver_handle{&driver_ctl}};
 
 	hoster host{
-		mem, [](char* str)
+		mem, [](const char* str)
 		{
 			LI_FN(OutputDebugStringA)(str);
 		}
 	};
 
-	cheat(host); // TODO cheat
+	// cheat(host); // TODO cheat
+	test(host);
 
 	return 0;
 }

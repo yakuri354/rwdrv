@@ -39,6 +39,9 @@
     <ClInclude Include="provider.hpp">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="test.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -48,6 +51,9 @@
       <Filter>Source files</Filter>
     </ClCompile>
     <ClCompile Include="provider.cpp">
+      <Filter>Source files</Filter>
+    </ClCompile>
+    <ClCompile Include="test.cpp">
       <Filter>Source files</Filter>
     </ClCompile>
   </ItemGroup>
