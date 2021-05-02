@@ -399,7 +399,13 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 
 	std::cout << xs("[+] Found syscall -> 0x") << static_cast<void*>(sysCall) << std::endl;
 
-	if (sysCall(Ctl::PING, CTL_MAGIC, NULL) == CTLSTATUSBASE && !forceReloadDrv)
+	Control ctl{};
+	ctl.CtlCode = Ctl::PING;
+
+	LARGE_INTEGER lint{};
+	lint.QuadPart = uintptr_t(&ctl);
+
+	if (sysCall(lint.HighPart, CTL_MAGIC, lint.LowPart) == CTLSTATUSBASE && !forceReloadDrv)
 	{
 		std::cout << xs("[+] Driver already loaded, injecting dll") << std::endl;
 	}

@@ -19,24 +19,6 @@ uintptr_t driver::base()
 	return ctl.Result;
 }
 
-mem_info driver::virtual_query(void* addr)
-{
-	mem_info info{};
-	ctl.CtlCode = Ctl::VIRT_QUERY;
-	ctl.Source = addr;
-	ctl.Target = &info;
-
-	if (!CTL_SUCCESS(
-		send_req()
-	))
-	{
-		log("Could not query virtual address %p", addr);
-		throw std::exception("could not query virtual address");
-	}
-
-	return info;
-}
-
 bool driver::attach(uint32_t pid)
 {
 	log("Attached to process %u", pid);
@@ -44,10 +26,10 @@ bool driver::attach(uint32_t pid)
 	return true; // TODO Test for validity
 }
 
-bool driver::read_raw(void* addr, void* buf, const size_t size) // TODO Unified memcpy
+bool driver::read_raw(const void* addr, void* buf, const size_t size) // TODO Unified memcpy
 {
 	ctl.CtlCode = Ctl::VIRT_READ;
-	ctl.Source = addr;
+	ctl.Source = const_cast<void*>(addr);
 	ctl.Target = buf;
 	ctl.Size = size;
 	

@@ -25,8 +25,7 @@ struct provider
 {
 	virtual bool attach(uint32_t pid) = 0;
 	virtual uintptr_t base() = 0;
-	virtual mem_info virtual_query(void* addr) = 0;
-	virtual bool read_raw(void* addr, void* buf, size_t size) = 0;
+	virtual bool read_raw(const void* addr, void* buf, size_t size) = 0;
 	virtual bool write_raw(void* addr, const void* buf, size_t size) = 0;
 
 	template <typename T>
@@ -49,9 +48,8 @@ struct driver : provider
 	driver(const driver_handle& driver);
 
 	uintptr_t base() override;
-	mem_info virtual_query(void* addr) override;
 	bool attach(uint32_t pid) override;
-	bool read_raw(void* addr, void* buf, size_t size) override;
+	bool read_raw(const void* addr, void* buf, size_t size) override;
 	bool write_raw(void* addr, const void* buf, size_t size) override;
 
 private:

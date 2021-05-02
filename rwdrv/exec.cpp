@@ -32,10 +32,7 @@ NTSTATUS ExecuteRequest(Control* ctl, DriverState* driverState)
 	case Ctl::PHYS_MEMCPY:
 		return C_FN(MmCopyMemory)(ctl->Target, *reinterpret_cast<MM_COPY_ADDRESS*>(&ctl->Source),
 		                          ctl->Size, MM_COPY_MEMORY_PHYSICAL, &ctl->Result);
-	case Ctl::VIRT_QUERY:
-		return C_FN(ZwQueryVirtualMemory)(HANDLE(ctl->Pid), ctl->Source, MemoryBasicInformation,
-		                            ctl->Target, sizeof(MEMORY_BASIC_INFORMATION), &ctl->Result);
-	case Ctl::VIRT_READ:
+	case Ctl::VIRT_READ: // TODO VIRT_MEMCPY instead of this abomination
 #if USE_PHYSMEM
 		return Phys::ReadProcessMemory(HANDLE(ctl->Pid), ctl->Source, ctl->Target, ctl->Size, &ctl->Result);
 #else
@@ -93,10 +90,10 @@ NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSI
 	}
 
 	const auto status = C_FN(MmCopyVirtualMemory)(
-		C_FN(IoGetCurrentProcess)(),
-		buffer,
 		proc,
 		va,
+		C_FN(IoGetCurrentProcess)(),
+		buffer,
 		size,
 		UserMode,
 		bytesRead

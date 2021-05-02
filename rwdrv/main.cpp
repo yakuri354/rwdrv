@@ -31,6 +31,7 @@ UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64
 	}
 
 	return PHookFn(g::DriverState.Syscall.OrigPtr)(UINT32(a1), a4, UINT32(a3));
+	// TODO Stack overflow after running driver twice
 }
 
 
@@ -72,11 +73,21 @@ NTSTATUS SetupHook()
 
 	log("Realtek pointer location at [0x%p]", PVOID(rtDataPtr));
 
-	g::DriverState.Syscall.OrigPtr =
-		InterlockedExchangePointer(
-			static_cast<PVOID volatile*>(syscallDataPtr),
-			Search::RVA(rtLogFn, 1)
-		);
+	if (UINT64(Search::RVA(rtLogFn, 1)) == *PUINT64(syscallDataPtr))
+	{
+		log("Syscall is already hooked"); // TODO Proper handling of such situation
+#ifndef DEBUG
+		return STATUS_UNSUCCESSFUL;
+#endif
+		log("Pointing original syscall to other driver's dispatch. This will BSOD if the other driver is faulty.");
+		g::DriverState.Syscall.OrigPtr = *static_cast<PVOID volatile*>(rtDataPtr);
+	}
+	else
+		g::DriverState.Syscall.OrigPtr =
+			InterlockedExchangePointer(
+				static_cast<PVOID volatile*>(syscallDataPtr),
+				Search::RVA(rtLogFn, 1)
+			);
 
 	g::DriverState.Wmi.OrigPtr =
 		InterlockedExchangePointer(
@@ -86,7 +97,7 @@ NTSTATUS SetupHook()
 
 	g::DriverState.Syscall.PtrLoc = PUINT64(syscallDataPtr);
 	g::DriverState.Wmi.PtrLoc = PUINT64(rtDataPtr);
-	
+
 	log("Successfully placed hooks");
 
 	return STATUS_SUCCESS;
@@ -136,7 +147,7 @@ NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
 	return status;
 }
 
-NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
+NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase) // TODO Unload
 {
 	// Cannot use logging until g::KernelBase is set
 
@@ -144,7 +155,7 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
 	{
 		return STATUS_INVALID_PARAMETER;
 	}
-	
+
 	g::KernelBase = kernelBase;
 
 	log("Driver loaded at [0x%p]", baseAddress);

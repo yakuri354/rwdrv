@@ -2,33 +2,42 @@
 #include "test.h"
 
 
-void test(hoster host)
+void test(hoster host) // TODO Fix VirtQuery, writing, finish test
 {
-	host.logger(xs("Starting test"));
-
+	host.logger(xs("Starting test\n"));
+	
 	const auto pid = util::process_id(xs(L"notepad.exe"));
 	host.mem.attach(pid);
-	auto base = host.mem.base();
+	const auto base = host.mem.base();
 
-	host.logger(fmt::format("Attached; PID {}, Base {}", pid, base).c_str());
+	host.logger(fmt::format(xs("Attached; PID {}, Base {}\n"), pid, reca<void*>(base)).c_str());
 
-	_ASSERT_EXPR(host.mem.read<short>(base) == 0x5A4D, xs("Magic assertion failed"));
+	if (host.mem.read<short>(base) != 0x5A4D)
+		throw std::exception(xs("magic assertion failed\n"));
+	host.logger(xs("Magic correct\n"));
 
-	std::random_device dev{};
-
-	std::default_random_engine engine(dev());
-	const std::uniform_int_distribution<uint64_t> dist{};
-
-	for (auto i = 0; i < 10000; i++)
+	uint64_t time = 0;
+	for (auto i = 0; i < 10; i++)
 	{
-		auto value = dist(engine);
-		host.mem.write(base, value);
-		if (host.mem.read<uint64_t>(base) != value)
+		LARGE_INTEGER then;
+		LI_FN(QueryPerformanceCounter)(&then);
+		for (auto i = 0; i < 10000; i++)
 		{
-			host.logger("Stress test failed");
-			return;
+			uint32_t value = 0xDEADBEEF;
+			host.mem.write(base, value);
+			if (host.mem.read<uint32_t>(base) != value)
+				throw std::exception(xs("stress test failed"));
 		}
+		LARGE_INTEGER now;
+		LI_FN(QueryPerformanceCounter)(&now);
+		LARGE_INTEGER tick_rate;
+		LI_FN(QueryPerformanceFrequency)(&tick_rate);
+
+		auto elapsed = (now.QuadPart - then.QuadPart) * tick_rate.QuadPart / 1000000Ui64;
+		time += elapsed;
+		
+		host.logger(fmt::format(xs("Completed test run #{} in {} us\n"), i + 1, elapsed).c_str());
 	}
 
-	host.logger("Test completed successfully");
+	host.logger(fmt::format(xs("Test completed successfully, each r/w operation took {} us in average\n"), time / 100000).c_str());
 }

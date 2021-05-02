@@ -77,11 +77,6 @@ bool write_process_memory(uint32_t pid, uint64_t address, const void* buffer, si
 	return false;
 }
 
-bool virtual_query_ex(uint32_t pid, uint64_t address, MEMORY_BASIC_INFORMATION& mbi)
-{
-	return false;
-}
-
 uintptr_t get_proc_base(uint32_t pid)
 {
 	return 0;

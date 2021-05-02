@@ -61,6 +61,8 @@ bool cleanup()
 	return true;
 }
 
+void format(const char* str);
+
 DWORD WINAPI real_main(void* param)
 {
 	log("Starting initialization");
@@ -100,17 +102,26 @@ DWORD WINAPI real_main(void* param)
 
 	log("Starting cheat");
 
-	driver mem{driver_handle{&driver_ctl}};
+	try {
 
-	hoster host{
-		mem, [](const char* str)
-		{
-			LI_FN(OutputDebugStringA)(str);
-		}
-	};
+		driver mem{ driver_handle{&driver_ctl} };
 
-	// cheat(host); // TODO cheat
-	test(host);
+		const hoster host{
+			mem, [](const char* str)
+			{
+				LI_FN(OutputDebugStringA)(str);
+			}
+		};
+
+		// cheat(host); // TODO cheat
+		test(host);
+	} catch (std::exception &e)
+	{
+		log("An unhandled exception occured: %s", e.what());
+	} catch (...)
+	{
+		log("An unknown exception occured");
+	}
 
 	return 0;
 }

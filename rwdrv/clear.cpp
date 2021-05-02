@@ -198,7 +198,6 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr) // TODO Fix
 
 	log("Clearing SystemBigPoolInfo");
 
-
 	if (!FindBigPoolTable(&pPoolBigPageTable, &bigPoolTableSize))
 	{
 		log("First method of finding BigPoolTable failed, trying alt method");
@@ -212,23 +211,45 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr) // TODO Fix
 	PPOOL_TRACKER_BIG_PAGES poolBigPageTable{};
 	RtlCopyMemory(&poolBigPageTable, PVOID(pPoolBigPageTable), 8);
 	
-	log("Found BigPoolPageTable at [0x%p]", poolBigPageTable);
-	
+	log("Found BigPoolPageTable at [0x%p] with %llu entries", poolBigPageTable, bigPoolTableSize);
+
 	log("Searching for address [%p]", pageAddr);
-	
+
 	for (size_t i = 0; i < bigPoolTableSize; i++)
 	{
 		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
 		{
 			log("Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [0x%llx]",
-			    PVOID(poolBigPageTable[i].Va),
-			    poolBigPageTable[i].Key,
-			    poolBigPageTable[i].NumberOfBytes);
+				PVOID(poolBigPageTable[i].Va),
+				poolBigPageTable[i].Key,
+				poolBigPageTable[i].NumberOfBytes);
 			poolBigPageTable[i].Va = 0x1;
 			poolBigPageTable[i].NumberOfBytes = 0x0;
 			return STATUS_SUCCESS;
 		}
 	}
+	
+	log("Found BigPoolPageTable at [0x%p] with %llu entries", pPoolBigPageTable, bigPoolTableSize);
+	
+	log("Searching for address [%p]", pageAddr);
+	
+	for (size_t i = 0; i < bigPoolTableSize; i++)
+	{
+		if (pPoolBigPageTable[i].Va == ULONGLONG(pageAddr) || pPoolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
+		{
+			log("Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [0x%llx]",
+			    PVOID(pPoolBigPageTable[i].Va),
+			    pPoolBigPageTable[i].Key,
+			    pPoolBigPageTable[i].NumberOfBytes);
+			pPoolBigPageTable[i].Va = 0x1;
+			pPoolBigPageTable[i].NumberOfBytes = 0x0;
+			return STATUS_SUCCESS;
+		}
+	}
+
+	// DEBUG
+
+	
 
 	log("Entry in BigPoolTable not found!");
 	// return STATUS_NOT_FOUND;

@@ -68,7 +68,7 @@ NTSTATUS Phys::ReadPhysicalAddress(PVOID TargetAddress, PVOID lpBuffer, SIZE_T S
 }
 
 //MmMapIoSpaceEx limit is page 4096 byte
-NTSTATUS Phys::WritePhysicalAddress(PVOID targetAddress, PVOID lpBuffer, SIZE_T Size, SIZE_T* BytesWritten)
+NTSTATUS Phys::WritePhysicalAddress(PVOID targetAddress, PVOID lpBuffer, SIZE_T Size, SIZE_T* BytesWritten) // TODO Figure this out
 {
 	if (!targetAddress)
 		return STATUS_UNSUCCESSFUL;

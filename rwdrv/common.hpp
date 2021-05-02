@@ -22,7 +22,7 @@ constexpr bool NT_SUCCESS(NTSTATUS status)
 
 
 template <typename T>
-__forceinline auto cmPtr(UINT32 high, UINT32 low)
+__forceinline T* cmPtr(UINT32 high, UINT32 low)
 {
 	return reinterpret_cast<T*>(UINT64(high) << 32 | low);
 }
