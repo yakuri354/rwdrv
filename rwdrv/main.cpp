@@ -158,7 +158,12 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase) // TO
 
 	g::KernelBase = kernelBase;
 
-	log("Driver loaded at [0x%p]", baseAddress);
+#ifdef DEBUG
+	logRaw("\n\n\n--------------------------------------\n");
+#endif
+
+	log("Driver loaded at [0x%p]; size %u; allocSize %u", baseAddress, imageSize,
+		imageSize != PAGE_SIZE ? ((imageSize / PAGE_SIZE) + 1) * PAGE_SIZE : imageSize);
 
 	auto status = InitRoutine(baseAddress, imageSize, kernelBase);
 	if (!NT_SUCCESS(status))

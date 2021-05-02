@@ -45,7 +45,9 @@ struct DriverState
 
 #ifdef DEBUG
 
-#define log(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "[rwdrv] " fmt "\n", ##__VA_ARGS__)
+#define formatLogMsg(__fmt) ("[rwdrv] " __fmt "\n")
+#define logRaw(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, fmt, ##__VA_ARGS__)
+#define log(fmt, ...) logRaw(formatLogMsg(fmt), ##__VA_ARGS__)
 #define dbgLog log
 
 #define ASSERT_TRUE(exp) ASSERT(exp)
@@ -265,11 +267,11 @@ typedef struct _POOL_TRACKER_BIG_PAGES
 {
 	volatile ULONGLONG Va;                                                  //0x0
 	ULONG Key;                                                              //0x8
-	ULONG Pattern;                                                        //0xc
-	ULONG PoolType;                                                      //0xc
-	ULONG SlushSize;                                                     //0xc
+	ULONG Pattern : 8;                                                      //0xc
+	ULONG PoolType : 12;                                                    //0xc
+	ULONG SlushSize : 12;                                                   //0xc
 	ULONGLONG NumberOfBytes;                                                //0x10
-} POOL_TRACKER_BIG_PAGES, * PPOOL_TRACKER_BIG_PAGES;
+} POOL_TRACKER_BIG_PAGES, *PPOOL_TRACKER_BIG_PAGES;
 
 #ifdef DEBUG
 extern "C" __declspec(dllimport)

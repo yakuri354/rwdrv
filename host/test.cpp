@@ -6,7 +6,7 @@ void test(hoster host) // TODO Fix VirtQuery, writing, finish test
 {
 	host.logger(xs("Starting test\n"));
 	
-	const auto pid = util::process_id(xs(L"notepad.exe"));
+	const auto pid = util::process_id(xs(L"explorer.exe"));
 	host.mem.attach(pid);
 	const auto base = host.mem.base();
 

@@ -15,7 +15,6 @@ NTSTATUS Clear::CleanupMiscTraces(DriverState *driverState)
 	// 	log(skCrypt("[rwdrv] Spoofing disk serials failed");
 	// 	return status;
 	// }
-	// TODO Needs debugging
 	if (driverState->ImageSize >= 0x1000)
 	{
 		status = ClearSystemBigPoolInfo(driverState->BaseAddress);
@@ -88,7 +87,7 @@ NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDis
 NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 {
 	log("Removing Pfn database entry");
-	log("Allocating MDL for address [%p] and size %u", pageAddress, pageSize);
+	log("Allocating MDL for [0x%p]; size %u", pageAddress, pageSize);
 	auto* const mdl = C_FN(IoAllocateMdl)(PVOID(pageAddress), pageSize, false, false, nullptr);
 
 	if (mdl == nullptr)
@@ -126,7 +125,7 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 }
 
 
-BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* poolBigPageTableSize) // FIXME
+BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES** poolBigPageTable, SIZE_T* poolBigPageTableSize) // FIXME
 {
 	const auto bptSize = FindPattern(
 		reinterpret_cast<UINT64>(KernelBase),
@@ -153,13 +152,13 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* pool
 		return false;
 	}
 
-	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES>(RVA(bpt, 3));
+	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES*>(RVA(bpt, 3));
 	*poolBigPageTableSize = *static_cast<PSIZE_T>(RVA(bptSize, 3));
 	return true;
 }
 
 
-bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
+bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES** pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
 {
 	const auto exProtectPoolExCallInstructionsAddress = FindPattern(
 		reinterpret_cast<UINT64>(KernelBase),
@@ -179,7 +178,7 @@ bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPo
 		return false;
 
 	const auto poolBigPageTableInstructionAddress = UINT64(exProtectPoolExAddress) + 0x95;
-	*pPoolBigPageTable = PPOOL_TRACKER_BIG_PAGES(
+	*pPoolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES*>(
 		RVA(poolBigPageTableInstructionAddress, 3)
 	);
 
@@ -191,10 +190,10 @@ bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPo
 }
 
 
-NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr) // TODO Fix
+NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 {
 	SIZE_T bigPoolTableSize;
-	PPOOL_TRACKER_BIG_PAGES pPoolBigPageTable;
+	PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable;
 
 	log("Clearing SystemBigPoolInfo");
 
@@ -207,51 +206,29 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr) // TODO Fix
 			return STATUS_UNSUCCESSFUL;
 		}
 	}
-	
+
 	PPOOL_TRACKER_BIG_PAGES poolBigPageTable{};
 	RtlCopyMemory(&poolBigPageTable, PVOID(pPoolBigPageTable), 8);
 	
-	log("Found BigPoolPageTable at [0x%p] with %llu entries", poolBigPageTable, bigPoolTableSize);
-
-	log("Searching for address [%p]", pageAddr);
+	log("Found BigPoolPageTable at [0x%p] of size %llu; scanning", poolBigPageTable, bigPoolTableSize);
 
 	for (size_t i = 0; i < bigPoolTableSize; i++)
 	{
 		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
 		{
-			log("Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [0x%llx]",
+			char tag[5];
+			RtlCopyMemory(&tag, &poolBigPageTable[i].Key, 4);
+			log("Found an entry in BigPoolTable: [0x%p]; Tag: 0x%X '%s'; Size: %llu (0x%llX)",
 				PVOID(poolBigPageTable[i].Va),
-				poolBigPageTable[i].Key,
+				poolBigPageTable[i].Key, tag,
+				poolBigPageTable[i].NumberOfBytes,
 				poolBigPageTable[i].NumberOfBytes);
 			poolBigPageTable[i].Va = 0x1;
 			poolBigPageTable[i].NumberOfBytes = 0x0;
 			return STATUS_SUCCESS;
 		}
 	}
-	
-	log("Found BigPoolPageTable at [0x%p] with %llu entries", pPoolBigPageTable, bigPoolTableSize);
-	
-	log("Searching for address [%p]", pageAddr);
-	
-	for (size_t i = 0; i < bigPoolTableSize; i++)
-	{
-		if (pPoolBigPageTable[i].Va == ULONGLONG(pageAddr) || pPoolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
-		{
-			log("Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [0x%llx]",
-			    PVOID(pPoolBigPageTable[i].Va),
-			    pPoolBigPageTable[i].Key,
-			    pPoolBigPageTable[i].NumberOfBytes);
-			pPoolBigPageTable[i].Va = 0x1;
-			pPoolBigPageTable[i].NumberOfBytes = 0x0;
-			return STATUS_SUCCESS;
-		}
-	}
-
-	// DEBUG
-
-	
 
 	log("Entry in BigPoolTable not found!");
-	// return STATUS_NOT_FOUND;
-	return STATUS_SUCCESS; // TODO Fix this
+	return STATUS_NOT_FOUND;
 }
