@@ -8,7 +8,7 @@
 #include "import.hpp"
 #include "skcrypt.hpp"
 
-constexpr ULONG BB_POOL_TAG = 'enoB';
+constexpr ULONG BB_POOL_TAG = 'erhT';
 
 namespace g
 {
@@ -46,6 +46,7 @@ struct DriverState
 
 #define formatLogMsg(__fmt) ("[rwdrv] " __fmt "\n")
 #define log(fmt, ...) logRaw(formatLogMsg(fmt), ##__VA_ARGS__)
+#define F_INLINE __forceinline
 
 #ifdef DEBUG
 #define logRaw(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, fmt, ##__VA_ARGS__)
@@ -54,7 +55,6 @@ struct DriverState
 #define ASSERT_TRUE(exp) ASSERT(exp)
 
 #else
-
 #define logRaw(fmt, ...) {auto crypter = skCrypt(fmt); C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, crypter, ##__VA_ARGS__); crypter.clear(); }(1)
 #define dbgLog(...)
 
@@ -64,7 +64,6 @@ struct DriverState
         TRUE)
 
 #endif
-
 
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION

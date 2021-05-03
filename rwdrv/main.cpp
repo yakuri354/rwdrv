@@ -35,7 +35,7 @@ UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64
 }
 
 
-NTSTATUS SetupHook()
+F_INLINE NTSTATUS SetupHook()
 {
 	// The outside function, first in the chain
 	// __int64 __fastcall ApiSetEditionOpenInputDesktopEntryPoint(unsigned int a1, unsigned int a2, unsigned int a3)
@@ -103,7 +103,7 @@ NTSTATUS SetupHook()
 	return STATUS_SUCCESS;
 }
 
-bool CheckPEImage(PVOID imgBase)
+F_INLINE bool CheckPEImage(PVOID imgBase)
 {
 	if (!imgBase)
 	{
@@ -133,7 +133,7 @@ bool CheckPEImage(PVOID imgBase)
 }
 
 
-NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase, ULONG tag)
+F_INLINE NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase, ULONG tag)
 {
 	g::DriverState.BaseAddress = baseAddr;
 	g::DriverState.ImageSize = imageSize;
@@ -160,17 +160,16 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, ULONG tag, PVOID kernel
 	g::KernelBase = kernelBase;
 
 #ifdef DEBUG
-	//logRaw("\n\n\n--------------------------------------------------------\n\n");
+	logRaw("\n\n\n--------------------------------------------------------\n\n");
 #endif
 	char sTag[5] = { 0 };
 	RtlCopyMemory(sTag, &tag, 4);
-	log("Driver loaded at [0x%p]; size %u; tag '%s'", baseAddress, imageSize, sTag);
+	log("Driver loaded at [0x%p] | Size 0x%x | Tag '%s'", baseAddress, imageSize, sTag);
 
 	auto status = InitRoutine(baseAddress, imageSize, kernelBase, tag);
 	if (!NT_SUCCESS(status))
 	{
 		log("Driver initialization routine failed.");
-		C_FN(ExFreePoolWithTag)(baseAddress, tag);
 		return status;
 	}
 

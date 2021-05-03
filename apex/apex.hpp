@@ -4,6 +4,7 @@
 #include "../host/util.hpp"
 #include "entity.hpp"
 #include <cstdint>
+#include <memory>
 
 namespace apex {
 

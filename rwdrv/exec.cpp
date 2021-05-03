@@ -52,7 +52,7 @@ NTSTATUS ExecuteRequest(Control* ctl, DriverState* driverState)
 }
 
 
-NTSTATUS ReadVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead)
+F_INLINE NTSTATUS ReadVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead)
 {
 	PEPROCESS proc;
 
@@ -80,7 +80,7 @@ NTSTATUS ReadVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZ
 	return status;
 }
 
-NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead)
+F_INLINE NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead)
 {
 	PEPROCESS proc;
 	if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(pid, &proc)))
@@ -107,7 +107,7 @@ NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSI
 	return status;
 }
 
-NTSTATUS UnloadDriver(DriverState* state)
+F_INLINE NTSTATUS UnloadDriver(DriverState* state)
 {
 	InterlockedExchangePointer(
 		reinterpret_cast<volatile PVOID*>(state->Syscall.PtrLoc),

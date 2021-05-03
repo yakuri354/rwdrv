@@ -30,58 +30,59 @@ NTSTATUS Clear::CleanupMiscTraces(DriverState *driverState)
 		log("Clearing Pfn table entry failed");
 		return status;
 	}
+	driverState->TracesCleaned = true;
 	return STATUS_SUCCESS;
 }
 
 
-NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDispatchAddress)
-{
-	// Pasted from
-	// https://www.unknowncheats.me/forum/anti-cheat-bypass/425937-spoofing-disk-smart-serials-hooks-technically.html
-	
-	UNREFERENCED_PARAMETER(kernelBase);
-	log("Spoofing disk serials");
-
-	UNICODE_STRING driverDisk;
-	C_FN(RtlInitUnicodeString)(&driverDisk, skCrypt(L"\\Driver\\Disk"));
-
-	UNICODE_STRING objName;
-	C_FN(RtlInitUnicodeString)(&objName, skCrypt(L"IoDriverObjectType"));
-
-	auto* const driverObjectType =
-		static_cast<POBJECT_TYPE*>(C_FN(MmGetSystemRoutineAddress)(&objName));
-
-	if (driverObjectType == nullptr)
-	{
-		log("Failed to get IoDriverObjectType");
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	PDRIVER_OBJECT driverObject;
-
-	const auto status = C_FN(ObReferenceObjectByName)(
-		&driverDisk,
-		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
-		nullptr,
-		NULL,
-		*driverObjectType,
-		KernelMode,
-		nullptr,
-		reinterpret_cast<PVOID*>(&driverObject)
-	);
-	if (!NT_SUCCESS(status))
-		return STATUS_UNSUCCESSFUL;
-
-	*originalDispatchAddress = PDRIVER_DISPATCH(
-		InterlockedExchangePointer(
-			reinterpret_cast<void**>(&driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]),
-			driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]
-		));
-
-	C_FN(ObfDereferenceObject)(driverObject);
-
-	return STATUS_SUCCESS;
-}
+// NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDispatchAddress)
+// {
+// 	// Pasted from
+// 	// https://www.unknowncheats.me/forum/anti-cheat-bypass/425937-spoofing-disk-smart-serials-hooks-technically.html
+// 	
+// 	UNREFERENCED_PARAMETER(kernelBase);
+// 	log("Spoofing disk serials");
+//
+// 	UNICODE_STRING driverDisk;
+// 	C_FN(RtlInitUnicodeString)(&driverDisk, skCrypt(L"\\Driver\\Disk"));
+//
+// 	UNICODE_STRING objName;
+// 	C_FN(RtlInitUnicodeString)(&objName, skCrypt(L"IoDriverObjectType"));
+//
+// 	auto* const driverObjectType =
+// 		static_cast<POBJECT_TYPE*>(C_FN(MmGetSystemRoutineAddress)(&objName));
+//
+// 	if (driverObjectType == nullptr)
+// 	{
+// 		log("Failed to get IoDriverObjectType");
+// 		return STATUS_UNSUCCESSFUL;
+// 	}
+//
+// 	PDRIVER_OBJECT driverObject{};
+//
+// 	const auto status = C_FN(ObReferenceObjectByName)(
+// 		&driverDisk,
+// 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+// 		nullptr,
+// 		NULL,
+// 		*driverObjectType,
+// 		KernelMode,
+// 		nullptr,
+// 		reinterpret_cast<PVOID*>(&driverObject)
+// 	);
+// 	if (!NT_SUCCESS(status))
+// 		return STATUS_UNSUCCESSFUL;
+//
+// 	*originalDispatchAddress = PDRIVER_DISPATCH(
+// 		InterlockedExchangePointer(
+// 			reinterpret_cast<void**>(&driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]),
+// 			driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]
+// 		));
+//
+// 	C_FN(ObfDereferenceObject)(driverObject);
+//
+// 	return STATUS_SUCCESS;
+// }
 
 
 NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
@@ -220,10 +221,9 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 		{
 			char tag[5] = {0};
 			RtlCopyMemory(tag, &poolBigPageTable[i].Key, 4);
-			log("Found an entry in BigPoolTable: [0x%p]; Tag: '%s'; Size: %llu (0x%llX)",
-				PVOID(poolBigPageTable[i].Va), tag,
-				poolBigPageTable[i].NumberOfBytes,
-				poolBigPageTable[i].NumberOfBytes);
+			log("Found an entry in BigPoolTable: [0x%p] | Size: 0x%llX | Tag: '%s'",
+				PVOID(poolBigPageTable[i].Va),
+				poolBigPageTable[i].NumberOfBytes, tag);
 			poolBigPageTable[i].Va = 0x1;
 			poolBigPageTable[i].NumberOfBytes = 0x0;
 			cleared = true;

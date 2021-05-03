@@ -5,10 +5,12 @@ namespace apex
 {
 	namespace offsets
 	{
-		constexpr auto entity_size = 0x42E0;
+		constexpr auto entity_size = 0x4410;
 
-		constexpr auto entity_list = 0x18da338; // cl_entitylist
-		constexpr auto local_player = 0x1C75558; // LocalPlayer
+		constexpr auto entity_list = 0x18DB438; // cl_entitylist
+		constexpr auto local_player = 0x1C8AA98; // LocalPlayer
+
+		constexpr auto item_glow_val = 0x51408A89;
 
 		namespace entity
 		{
@@ -35,6 +37,8 @@ namespace apex
 			constexpr auto color = 0x1D0;
 			constexpr auto visible_type = 0x3d0;
 			constexpr auto fade = 0x388;
+
+			constexpr auto item_glow = 0x2c0;
 		}
 	}
 }
