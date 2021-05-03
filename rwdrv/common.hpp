@@ -15,7 +15,7 @@ namespace g
 	extern PVOID KernelBase;
 }
 
-constexpr bool NT_SUCCESS(NTSTATUS status)
+__forceinline bool NT_SUCCESS(NTSTATUS status)
 {
 	return status >= 0;
 }
@@ -38,23 +38,24 @@ struct DriverState
 	bool TracesCleaned;
 	PVOID BaseAddress;
 	ULONG ImageSize;
+	ULONG Tag;
 	HookData Syscall;
 	HookData Wmi;
 	PDRIVER_DISPATCH OriginalDiskDispatchFn;
 };
 
-#ifdef DEBUG
-
 #define formatLogMsg(__fmt) ("[rwdrv] " __fmt "\n")
-#define logRaw(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, fmt, ##__VA_ARGS__)
 #define log(fmt, ...) logRaw(formatLogMsg(fmt), ##__VA_ARGS__)
+
+#ifdef DEBUG
+#define logRaw(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, fmt, ##__VA_ARGS__)
 #define dbgLog log
 
 #define ASSERT_TRUE(exp) ASSERT(exp)
 
 #else
 
-#define log(fmt, ...) {auto crypter = skCrypt("[rwdrv] " fmt "\n"); C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, crypter, ##__VA_ARGS__); crypter.clear(); }(1)
+#define logRaw(fmt, ...) {auto crypter = skCrypt(fmt); C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, crypter, ##__VA_ARGS__); crypter.clear(); }(1)
 #define dbgLog(...)
 
 #define ASSERT_TRUE( exp ) \

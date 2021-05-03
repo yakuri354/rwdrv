@@ -76,9 +76,9 @@ NTSTATUS SetupHook()
 	if (UINT64(Search::RVA(rtLogFn, 1)) == *PUINT64(syscallDataPtr))
 	{
 		log("Syscall is already hooked"); // TODO Proper handling of such situation
-#ifndef DEBUG
-		return STATUS_UNSUCCESSFUL;
-#endif
+// #ifndef DEBUG
+// 		return STATUS_UNSUCCESSFUL;
+// #endif
 		log("Pointing original syscall to other driver's dispatch. This will BSOD if the other driver is faulty.");
 		g::DriverState.Syscall.OrigPtr = *static_cast<PVOID volatile*>(rtDataPtr);
 	}
@@ -133,10 +133,11 @@ bool CheckPEImage(PVOID imgBase)
 }
 
 
-NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
+NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase, ULONG tag)
 {
 	g::DriverState.BaseAddress = baseAddr;
 	g::DriverState.ImageSize = imageSize;
+	g::DriverState.Tag = tag;
 
 	const auto status = Search::SetKernelProps(kernelBase);
 	if (!NT_SUCCESS(status))
@@ -147,7 +148,7 @@ NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
 	return status;
 }
 
-NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase) // TODO Unload
+NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, ULONG tag, PVOID kernelBase) // TODO Unload
 {
 	// Cannot use logging until g::KernelBase is set
 
@@ -159,16 +160,17 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase) // TO
 	g::KernelBase = kernelBase;
 
 #ifdef DEBUG
-	logRaw("\n\n\n--------------------------------------\n");
+	//logRaw("\n\n\n--------------------------------------------------------\n\n");
 #endif
+	char sTag[5] = { 0 };
+	RtlCopyMemory(sTag, &tag, 4);
+	log("Driver loaded at [0x%p]; size %u; tag '%s'", baseAddress, imageSize, sTag);
 
-	log("Driver loaded at [0x%p]; size %u; allocSize %u", baseAddress, imageSize,
-		imageSize != PAGE_SIZE ? ((imageSize / PAGE_SIZE) + 1) * PAGE_SIZE : imageSize);
-
-	auto status = InitRoutine(baseAddress, imageSize, kernelBase);
+	auto status = InitRoutine(baseAddress, imageSize, kernelBase, tag);
 	if (!NT_SUCCESS(status))
 	{
 		log("Driver initialization routine failed.");
+		C_FN(ExFreePoolWithTag)(baseAddress, tag);
 		return status;
 	}
 
@@ -176,7 +178,6 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase) // TO
 	if (!NT_SUCCESS(status))
 	{
 		log("Failed to setup communication hook");
-		return status;
 	}
 
 	return status;

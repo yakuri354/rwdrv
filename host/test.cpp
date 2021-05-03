@@ -6,15 +6,19 @@ void test(hoster host) // TODO Fix VirtQuery, writing, finish test
 {
 	host.logger(xs("Starting test\n"));
 	
-	const auto pid = util::process_id(xs(L"explorer.exe"));
+	const auto pid = util::process_id(xs(L"notepad.exe"));
 	host.mem.attach(pid);
 	const auto base = host.mem.base();
 
 	host.logger(fmt::format(xs("Attached; PID {}, Base {}\n"), pid, reca<void*>(base)).c_str());
 
-	if (host.mem.read<short>(base) != 0x5A4D)
+	auto mg = host.mem.read<short>(base);
+	host.logger(fmt::format(xs("Magic {0:#x}"), mg).c_str());
+	if (mg != 0x5A4D) {
+		host.logger(xs("; incorrect\n"));
 		throw std::exception(xs("magic assertion failed\n"));
-	host.logger(xs("Magic correct\n"));
+	}
+	host.logger(xs("; correct\n"));
 
 	uint64_t time = 0;
 	for (auto i = 0; i < 10; i++)
