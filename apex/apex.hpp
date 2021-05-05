@@ -1,9 +1,10 @@
 #pragma once
 // #include "../umcontrol/hostframework.h"
-#include "../host/memory.hpp"
+#include "../host/provider.hpp"
 #include "../host/util.hpp"
 #include "entity.hpp"
 #include <cstdint>
+#include <memory>
 
 namespace apex {
 
@@ -32,7 +33,7 @@ namespace apex {
 	
 	struct game
 	{
-		explicit game(memory& mem);
+		explicit game(provider& mem);
 		
 		uintptr_t entity_list() const;
 		uintptr_t local_player() const;
@@ -42,6 +43,6 @@ namespace apex {
 
 		uintptr_t base;
 	private:
-		memory& memory_;
+		provider& memory_;
 	};
 }

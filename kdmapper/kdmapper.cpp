@@ -32,6 +32,8 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 
 	auto TotalVirtualHeaderSize = (IMAGE_FIRST_SECTION(nt_headers))->VirtualAddress;
 
+	// TODO Manual page allocation
+
 	auto kernel_image_base = intel_driver::AllocatePool(iqvw64e_device_handle, nt::POOL_TYPE::NonPagedPool, image_size - TotalVirtualHeaderSize);
 
 	do
@@ -96,7 +98,7 @@ uint64_t kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& dr
 
 		const auto kernelBase = utils::GetKernelModuleAddress("ntoskrnl.exe");
 
-		if (!intel_driver::CallKernelFunction(iqvw64e_device_handle, &status, address_of_entry_point, realBase, image_size - TotalVirtualHeaderSize, kernelBase))
+		if (!intel_driver::CallKernelFunction(iqvw64e_device_handle, &status, address_of_entry_point, realBase, image_size - TotalVirtualHeaderSize, 'erhT', kernelBase))
 		{
 			std::cout << "[-] Failed to call driver entry" << std::endl;
 			kernel_image_base = realBase;

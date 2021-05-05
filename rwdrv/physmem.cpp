@@ -7,7 +7,7 @@ UINT64 TranslateLinearAddress(UINT64 directoryTableBase, UINT64 virtualAddress);
 DWORD GetUserDirectoryTableBaseOffset()
 {
 	RTL_OSVERSIONINFOW ver = { 0 };
-	RtlGetVersion(&ver);
+	C_FN(RtlGetVersion)(&ver);
 
 	switch (ver.dwBuildNumber)
 	{
@@ -43,7 +43,7 @@ ULONG_PTR GetProcessCr3(PEPROCESS pProcess)
 
 ULONG_PTR GetKernelDirBase()
 {
-	const auto process = UINT64(PsGetCurrentProcess());
+	const auto process = UINT64(C_FN(IoGetCurrentProcess)());
 	const auto cr3 = *PULONG_PTR(process + 0x28); //dirbase x64, 32bit is 0x18
 	return cr3;
 }
@@ -64,11 +64,11 @@ NTSTATUS Phys::ReadPhysicalAddress(PVOID TargetAddress, PVOID lpBuffer, SIZE_T S
 {
 	MM_COPY_ADDRESS addrToRead;
 	addrToRead.PhysicalAddress.QuadPart = UINT64(TargetAddress);
-	return MmCopyMemory(lpBuffer, addrToRead, Size, MM_COPY_MEMORY_PHYSICAL, BytesRead);
+	return C_FN(MmCopyMemory)(lpBuffer, addrToRead, Size, MM_COPY_MEMORY_PHYSICAL, BytesRead);
 }
 
 //MmMapIoSpaceEx limit is page 4096 byte
-NTSTATUS Phys::WritePhysicalAddress(PVOID targetAddress, PVOID lpBuffer, SIZE_T Size, SIZE_T* BytesWritten)
+NTSTATUS Phys::WritePhysicalAddress(PVOID targetAddress, PVOID lpBuffer, SIZE_T Size, SIZE_T* BytesWritten) // TODO Figure this out
 {
 	if (!targetAddress)
 		return STATUS_UNSUCCESSFUL;
@@ -76,7 +76,7 @@ NTSTATUS Phys::WritePhysicalAddress(PVOID targetAddress, PVOID lpBuffer, SIZE_T 
 	PHYSICAL_ADDRESS AddrToWrite = { 0 };
 	AddrToWrite.QuadPart = UINT64(targetAddress);
 
-	auto* const pmappedMem = MmMapIoSpaceEx(AddrToWrite, Size, PAGE_READWRITE);
+	auto* const pmappedMem = C_FN(MmMapIoSpaceEx)(AddrToWrite, Size, PAGE_READWRITE);
 
 	if (!pmappedMem)
 		return STATUS_UNSUCCESSFUL;
@@ -84,7 +84,7 @@ NTSTATUS Phys::WritePhysicalAddress(PVOID targetAddress, PVOID lpBuffer, SIZE_T 
 	memcpy(pmappedMem, lpBuffer, Size);
 
 	*BytesWritten = Size;
-	MmUnmapIoSpace(pmappedMem, Size);
+	C_FN(MmUnmapIoSpace)(pmappedMem, Size);
 	return STATUS_SUCCESS;
 }
 
@@ -167,11 +167,11 @@ NTSTATUS Phys::ReadProcessMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size
 	PEPROCESS pProcess = nullptr;
 	if (pid == 0) return STATUS_UNSUCCESSFUL;
 
-	const auto status = PsLookupProcessByProcessId(HANDLE(pid), &pProcess);
+	const auto status = C_FN(PsLookupProcessByProcessId)(HANDLE(pid), &pProcess);
 	if (status != STATUS_SUCCESS) return status;
 
 	const auto processDirbase = GetProcessCr3(pProcess);
-	ObDereferenceObject(pProcess);
+	C_FN(ObfDereferenceObject)(pProcess);
 
 	SIZE_T curOffset = 0;
 	auto totalSize = size;
@@ -197,11 +197,11 @@ NTSTATUS Phys::WriteProcessMemory(HANDLE pid, PVOID Address, PVOID AllocatedBuff
 	PEPROCESS pProcess{};
 	if (pid == 0) return STATUS_UNSUCCESSFUL;
 
-	const auto status = PsLookupProcessByProcessId(HANDLE(pid), &pProcess);
+	const auto status = C_FN(PsLookupProcessByProcessId)(HANDLE(pid), &pProcess);
 	if (status != STATUS_SUCCESS) return status;
 
 	const auto processDirbase = GetProcessCr3(pProcess);
-	ObDereferenceObject(pProcess);
+	C_FN(ObfDereferenceObject)(pProcess);
 
 	SIZE_T curOffset = 0;
 	auto totalSize = size;

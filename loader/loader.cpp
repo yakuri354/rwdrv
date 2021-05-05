@@ -48,13 +48,12 @@ std::string GenRandStr(const int len)
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"abcdefghijklmnopqrstuvwxyz";
 
-	srand(static_cast<unsigned>(time(nullptr)) * _getpid());
+	srand(static_cast<unsigned>(time(nullptr)) * GetCurrentProcessId());
 
 	tmp_s.reserve(len);
 
 	for (auto i = 0; i < len; ++i)
 		tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
-
 
 	return tmp_s;
 }
@@ -371,6 +370,25 @@ PHookFn get_hook_fn()
 	return LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
 }
 
+bool check_driver() {
+	const auto sysCall = get_hook_fn();
+	if (!sysCall)
+	{
+		std::cout << xs("[-] Failed to obtain hooked syscall") << std::endl;
+		return 1;
+	}
+
+	std::cout << xs("[+] Found syscall -> 0x") << static_cast<void*>(sysCall) << std::endl;
+
+	Control ctl{};
+	ctl.CtlCode = Ctl::PING;
+
+	LARGE_INTEGER lint{};
+	lint.QuadPart = uintptr_t(&ctl);
+
+	return sysCall(lint.HighPart, CTL_MAGIC, lint.LowPart) == CTLSTATUSBASE;
+}
+
 int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 {
 	std::cout << xs("[>] Loading rwdrv") << std::endl;
@@ -381,7 +399,7 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 		return 1;
 	}
 
-	srand(static_cast<unsigned>(time(nullptr)) * _getpid());
+	srand(static_cast<unsigned>(time(nullptr)) * GetCurrentProcessId());
 
 	if (!check_serivice())
 	{
@@ -391,17 +409,7 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 
 	std::cout << xs("[+] BE service not found") << std::endl;
 
-	const auto sysCall = get_hook_fn();
-	if (!sysCall)
-	{
-		std::cout << xs("[-] Failed to obtain hooked syscall") << std::endl;
-		return 1;
-	}
-
-	std::cout << xs("[+] Found syscall -> 0x") << static_cast<void*>(sysCall) << std::endl;
-
-	if (sysCall(Ctl::PING, CTL_MAGIC, NULL) == CTLSTATUSBASE && !forceReloadDrv)
-	{
+	if (!forceReloadDrv && check_driver()) {
 		std::cout << xs("[+] Driver already loaded, injecting dll") << std::endl;
 	}
 	else if (!load_driver())

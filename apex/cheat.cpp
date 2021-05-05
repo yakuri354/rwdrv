@@ -2,7 +2,7 @@
 
 #include "apex.hpp"
 // TODO redo logging
-void cheat::run(memory& mem)
+void cheat::run(provider& mem)
 {
 	log("Starting cheat loop");
 

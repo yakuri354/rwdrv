@@ -281,13 +281,14 @@
     <ClInclude Include="hoster.hpp" />
     <ClInclude Include="hostframework.h" />
     <ClInclude Include="lazy_importer.hpp" />
-    <ClInclude Include="memory.hpp" />
+    <ClInclude Include="provider.hpp" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="test.h" />
     <ClInclude Include="util.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="memory.cpp" />
+    <ClCompile Include="provider.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -296,11 +297,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DbgRelease|x64'">Create</PrecompiledHeader>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\apexbot\apexbot.vcxproj">
-      <Project>{b5065eb8-6ca1-4b15-8a6d-9ef3fbfbc231}</Project>
-    </ProjectReference>
+    <ClCompile Include="test.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

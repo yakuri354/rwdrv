@@ -3,10 +3,11 @@
 #include <ntifs.h>
 #include "common.hpp"
 
-__forceinline NTSTATUS GetProcessBase(HANDLE pid, OUT PVOID *address)
+F_INLINE NTSTATUS GetProcessBase(HANDLE pid, OUT PVOID *address)
 {
-	KAPC_STATE state;
 	PEPROCESS proc;
+
+	if (pid == nullptr) return STATUS_NOT_FOUND;
 
 	const auto status = C_FN(PsLookupProcessByProcessId)(pid, &proc);
 	
@@ -15,12 +16,8 @@ __forceinline NTSTATUS GetProcessBase(HANDLE pid, OUT PVOID *address)
 		log("Could not find process");
 		return STATUS_NOT_FOUND;
 	}
-	
-	C_FN(KeStackAttachProcess)(proc, &state);
-	
-	auto* va = C_FN(PsGetProcessSectionBaseAddress)(proc); // TODO No attach
 
-	C_FN(KeUnstackDetachProcess)(&state);
+	const auto va = C_FN(PsGetProcessSectionBaseAddress)(proc);
 
 	if (!va)
 	{
@@ -28,7 +25,7 @@ __forceinline NTSTATUS GetProcessBase(HANDLE pid, OUT PVOID *address)
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	*address = va;
+	*address = PVOID(va);
 
 	return STATUS_SUCCESS;
 }

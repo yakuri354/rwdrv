@@ -15,80 +15,80 @@ NTSTATUS Clear::CleanupMiscTraces(DriverState *driverState)
 	// 	log(skCrypt("[rwdrv] Spoofing disk serials failed");
 	// 	return status;
 	// }
-	// TODO Needs debugging
-	// if (driverState->ImageSize >= 0x1000)
-	// {
-	// 	status = ClearSystemBigPoolInfo(driverState->BaseAddress);
-	// 	if (!NT_SUCCESS(status))
-	// 	{
-	// 		log("Clearing BigPoolInfo failed");
-	// 		return status;
-	// 	}
-	// }
+	if (driverState->ImageSize >= 0x1000)
+	{
+		status = ClearSystemBigPoolInfo(driverState->BaseAddress);
+		if (!NT_SUCCESS(status))
+		{
+			log("Clearing BigPoolInfo failed");
+			return status;
+		}
+	}
 	status = ClearPfnEntry(driverState->BaseAddress, driverState->ImageSize);
 	if (!NT_SUCCESS(status))
 	{
 		log("Clearing Pfn table entry failed");
 		return status;
 	}
+	driverState->TracesCleaned = true;
 	return STATUS_SUCCESS;
 }
 
 
-NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDispatchAddress)
-{
-	// Pasted from
-	// https://www.unknowncheats.me/forum/anti-cheat-bypass/425937-spoofing-disk-smart-serials-hooks-technically.html
-	
-	UNREFERENCED_PARAMETER(kernelBase);
-	log("Spoofing disk serials");
-
-	UNICODE_STRING driverDisk;
-	C_FN(RtlInitUnicodeString)(&driverDisk, skCrypt(L"\\Driver\\Disk"));
-
-	UNICODE_STRING objName;
-	C_FN(RtlInitUnicodeString)(&objName, skCrypt(L"IoDriverObjectType"));
-
-	auto* const driverObjectType =
-		static_cast<POBJECT_TYPE*>(C_FN(MmGetSystemRoutineAddress)(&objName));
-
-	if (driverObjectType == nullptr)
-	{
-		log("Failed to get IoDriverObjectType");
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	PDRIVER_OBJECT driverObject;
-
-	const auto status = C_FN(ObReferenceObjectByName)(
-		&driverDisk,
-		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
-		nullptr,
-		NULL,
-		*driverObjectType,
-		KernelMode,
-		nullptr,
-		reinterpret_cast<PVOID*>(&driverObject)
-	);
-	if (!NT_SUCCESS(status))
-		return STATUS_UNSUCCESSFUL;
-
-	*originalDispatchAddress = PDRIVER_DISPATCH(
-		InterlockedExchangePointer(
-			reinterpret_cast<void**>(&driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]),
-			driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]
-		));
-
-	C_FN(ObfDereferenceObject)(driverObject);
-
-	return STATUS_SUCCESS;
-}
+// NTSTATUS Clear::SpoofDiskSerials(PVOID kernelBase, PDRIVER_DISPATCH* originalDispatchAddress)
+// {
+// 	// Pasted from
+// 	// https://www.unknowncheats.me/forum/anti-cheat-bypass/425937-spoofing-disk-smart-serials-hooks-technically.html
+// 	
+// 	UNREFERENCED_PARAMETER(kernelBase);
+// 	log("Spoofing disk serials");
+//
+// 	UNICODE_STRING driverDisk;
+// 	C_FN(RtlInitUnicodeString)(&driverDisk, skCrypt(L"\\Driver\\Disk"));
+//
+// 	UNICODE_STRING objName;
+// 	C_FN(RtlInitUnicodeString)(&objName, skCrypt(L"IoDriverObjectType"));
+//
+// 	auto* const driverObjectType =
+// 		static_cast<POBJECT_TYPE*>(C_FN(MmGetSystemRoutineAddress)(&objName));
+//
+// 	if (driverObjectType == nullptr)
+// 	{
+// 		log("Failed to get IoDriverObjectType");
+// 		return STATUS_UNSUCCESSFUL;
+// 	}
+//
+// 	PDRIVER_OBJECT driverObject{};
+//
+// 	const auto status = C_FN(ObReferenceObjectByName)(
+// 		&driverDisk,
+// 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+// 		nullptr,
+// 		NULL,
+// 		*driverObjectType,
+// 		KernelMode,
+// 		nullptr,
+// 		reinterpret_cast<PVOID*>(&driverObject)
+// 	);
+// 	if (!NT_SUCCESS(status))
+// 		return STATUS_UNSUCCESSFUL;
+//
+// 	*originalDispatchAddress = PDRIVER_DISPATCH(
+// 		InterlockedExchangePointer(
+// 			reinterpret_cast<void**>(&driverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]),
+// 			driverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]
+// 		));
+//
+// 	C_FN(ObfDereferenceObject)(driverObject);
+//
+// 	return STATUS_SUCCESS;
+// }
 
 
 NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 {
 	log("Removing Pfn database entry");
-	log("Allocating MDL for address [%p] and size %u", pageAddress, pageSize);
+	log("Allocating MDL for [0x%p]; size %u", pageAddress, pageSize);
 	auto* const mdl = C_FN(IoAllocateMdl)(PVOID(pageAddress), pageSize, false, false, nullptr);
 
 	if (mdl == nullptr)
@@ -126,7 +126,7 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 }
 
 
-BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* poolBigPageTableSize) // FIXME
+BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES** poolBigPageTable, SIZE_T* poolBigPageTableSize) // FIXME
 {
 	const auto bptSize = FindPattern(
 		reinterpret_cast<UINT64>(KernelBase),
@@ -153,13 +153,13 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES* poolBigPageTable, SIZE_T* pool
 		return false;
 	}
 
-	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES>(RVA(bpt, 3));
+	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES*>(RVA(bpt, 3));
 	*poolBigPageTableSize = *static_cast<PSIZE_T>(RVA(bptSize, 3));
 	return true;
 }
 
 
-bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
+bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES** pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
 {
 	const auto exProtectPoolExCallInstructionsAddress = FindPattern(
 		reinterpret_cast<UINT64>(KernelBase),
@@ -179,7 +179,7 @@ bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPo
 		return false;
 
 	const auto poolBigPageTableInstructionAddress = UINT64(exProtectPoolExAddress) + 0x95;
-	*pPoolBigPageTable = PPOOL_TRACKER_BIG_PAGES(
+	*pPoolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES*>(
 		RVA(poolBigPageTableInstructionAddress, 3)
 	);
 
@@ -191,13 +191,12 @@ bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable, SIZE_T* pPo
 }
 
 
-NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr) // TODO Fix
+NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 {
 	SIZE_T bigPoolTableSize;
-	PPOOL_TRACKER_BIG_PAGES pPoolBigPageTable;
+	PPOOL_TRACKER_BIG_PAGES* pPoolBigPageTable;
 
 	log("Clearing SystemBigPoolInfo");
-
 
 	if (!FindBigPoolTable(&pPoolBigPageTable, &bigPoolTableSize))
 	{
@@ -208,29 +207,32 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr) // TODO Fix
 			return STATUS_UNSUCCESSFUL;
 		}
 	}
-	
+
 	PPOOL_TRACKER_BIG_PAGES poolBigPageTable{};
 	RtlCopyMemory(&poolBigPageTable, PVOID(pPoolBigPageTable), 8);
 	
-	log("Found BigPoolPageTable at [0x%p]", poolBigPageTable);
-	
-	log("Searching for address [%p]", pageAddr);
-	
+	log("Found BigPoolPageTable at [0x%p] of size %llu; scanning", poolBigPageTable, bigPoolTableSize);
+
+	auto cleared = false;
+
 	for (size_t i = 0; i < bigPoolTableSize; i++)
 	{
 		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
 		{
-			log("Found an entry in BigPoolTable [0x%p], Tag: [0x%lX], Size: [0x%llx]",
-			    PVOID(poolBigPageTable[i].Va),
-			    poolBigPageTable[i].Key,
-			    poolBigPageTable[i].NumberOfBytes);
+			char tag[5] = { 0 };
+			RtlCopyMemory(tag, &poolBigPageTable[i].Key, 4);
+			log("Found an entry in BigPoolTable: [0x%p] | Size: 0x%llX | Tag: '%s'",
+				PVOID(poolBigPageTable[i].Va),
+				poolBigPageTable[i].NumberOfBytes, tag);
 			poolBigPageTable[i].Va = 0x1;
 			poolBigPageTable[i].NumberOfBytes = 0x0;
-			return STATUS_SUCCESS;
+			cleared = true;
+			//return STATUS_SUCCESS;
 		}
 	}
-
-	log("Entry in BigPoolTable not found!");
-	// return STATUS_NOT_FOUND;
-	return STATUS_SUCCESS; // TODO Fix this
+	if (!cleared) {
+		log("Entry in BigPoolTable not found!");
+		return STATUS_NOT_FOUND;
+	} 
+	return STATUS_SUCCESS;
 }

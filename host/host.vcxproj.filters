@@ -24,9 +24,6 @@
     <ClInclude Include="framework.h">
       <Filter>Header files</Filter>
     </ClInclude>
-    <ClInclude Include="memory.hpp">
-      <Filter>Header files</Filter>
-    </ClInclude>
     <ClInclude Include="common.hpp">
       <Filter>Header files</Filter>
     </ClInclude>
@@ -39,6 +36,12 @@
     <ClInclude Include="hoster.hpp">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="provider.hpp">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="test.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -47,7 +50,10 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source files</Filter>
     </ClCompile>
-    <ClCompile Include="memory.cpp">
+    <ClCompile Include="provider.cpp">
+      <Filter>Source files</Filter>
+    </ClCompile>
+    <ClCompile Include="test.cpp">
       <Filter>Source files</Filter>
     </ClCompile>
   </ItemGroup>

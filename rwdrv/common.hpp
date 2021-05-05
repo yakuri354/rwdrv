@@ -8,16 +8,23 @@
 #include "import.hpp"
 #include "skcrypt.hpp"
 
-constexpr ULONG BB_POOL_TAG = 'enoB';
+constexpr ULONG BB_POOL_TAG = 'erhT';
 
 namespace g
 {
 	extern PVOID KernelBase;
 }
 
-constexpr bool NT_SUCCESS(NTSTATUS status)
+__forceinline bool NT_SUCCESS(NTSTATUS status)
 {
 	return status >= 0;
+}
+
+
+template <typename T>
+__forceinline T* cmPtr(UINT32 high, UINT32 low)
+{
+	return reinterpret_cast<T*>(UINT64(high) << 32 | low);
 }
 
 struct HookData
@@ -28,27 +35,27 @@ struct HookData
 
 struct DriverState
 {
-	bool Initialized;
+	bool TracesCleaned;
 	PVOID BaseAddress;
 	ULONG ImageSize;
+	ULONG Tag;
 	HookData Syscall;
 	HookData Wmi;
 	PDRIVER_DISPATCH OriginalDiskDispatchFn;
-	PVOID SharedMemory;
-
-	HANDLE TargetProcess; // PID
 };
 
-#ifdef DEBUG
+#define formatLogMsg(__fmt) ("[rwdrv] " __fmt "\n")
+#define log(fmt, ...) logRaw(formatLogMsg(fmt), ##__VA_ARGS__)
+#define F_INLINE __forceinline
 
-#define log(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "[rwdrv] " fmt "\n", ##__VA_ARGS__)
+#ifdef DEBUG
+#define logRaw(fmt, ...) C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, fmt, ##__VA_ARGS__)
 #define dbgLog log
 
 #define ASSERT_TRUE(exp) ASSERT(exp)
 
 #else
-
-#define log(fmt, ...) {auto crypter = skCrypt("[rwdrv] " fmt "\n"); C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, crypter, ##__VA_ARGS__); crypter.clear(); }(1)
+#define logRaw(fmt, ...) {auto crypter = skCrypt(fmt); C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, crypter, ##__VA_ARGS__); crypter.clear(); }(1)
 #define dbgLog(...)
 
 #define ASSERT_TRUE( exp ) \
@@ -57,7 +64,6 @@ struct DriverState
         TRUE)
 
 #endif
-
 
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION
@@ -261,11 +267,11 @@ typedef struct _POOL_TRACKER_BIG_PAGES
 {
 	volatile ULONGLONG Va;                                                  //0x0
 	ULONG Key;                                                              //0x8
-	ULONG Pattern;                                                        //0xc
-	ULONG PoolType;                                                      //0xc
-	ULONG SlushSize;                                                     //0xc
+	ULONG Pattern : 8;                                                      //0xc
+	ULONG PoolType : 12;                                                    //0xc
+	ULONG SlushSize : 12;                                                   //0xc
 	ULONGLONG NumberOfBytes;                                                //0x10
-} POOL_TRACKER_BIG_PAGES, * PPOOL_TRACKER_BIG_PAGES;
+} POOL_TRACKER_BIG_PAGES, *PPOOL_TRACKER_BIG_PAGES;
 
 #ifdef DEBUG
 extern "C" __declspec(dllimport)

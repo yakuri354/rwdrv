@@ -336,11 +336,11 @@ bool intel_driver::ClearMmUnloadedDrivers(HANDLE device_handle)
 
 	uint64_t object = 0;
 
-	auto system_handle_inforamtion = static_cast<nt::PSYSTEM_HANDLE_INFORMATION_EX>(buffer);
+	auto system_handle_information = static_cast<nt::PSYSTEM_HANDLE_INFORMATION_EX>(buffer);
 
-	for (auto i = 0u; i < system_handle_inforamtion->HandleCount; ++i)
+	for (auto i = 0u; i < system_handle_information->HandleCount; ++i)
 	{
-		const nt::SYSTEM_HANDLE current_system_handle = system_handle_inforamtion->Handles[i];
+		const nt::SYSTEM_HANDLE current_system_handle = system_handle_information->Handles[i];
 
 		if (current_system_handle.UniqueProcessId != reinterpret_cast<HANDLE>(static_cast<uint64_t>(GetCurrentProcessId())))
 			continue;

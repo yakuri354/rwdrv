@@ -1,36 +1,50 @@
 #pragma once
-#include "common.hpp"
+#include "config.hpp"
 #ifdef DEBUG
 #define C_FN(name) name
 #else
 #ifdef IMPORT_NO_CACHE
-#define C_FN(name) (LazyFn<decltype(name), hash_string(#name)>())
+#define C_FN(name) (LazyFn<decltype(name), StrHash(#name)>())
 #else
-#define C_FN(name) (LazyFnCached<decltype(name), hash_string(#name)>())
+#define C_FN(name) (LazyFnCached<decltype(name), StrHash(#name)>())
 #endif
 #endif
 
-constexpr char inits[] = __TIME__;
+constexpr auto TSeed = __TIME__;
 
-constexpr UINT32 seedBase = (inits[0] - '0') * 100000 + (inits[1] - '0') * 10000 + (inits[3] - '0') * 1000 + (inits[4] -
-	'0') * 100 + (inits[6] - '0') * 10 + inits[7] - '0';
-
-constexpr UINT32 hash_string(const char* s)
+constexpr auto Seed()
 {
-	UINT32 hash = 0;
+	UINT64 d = 0;
 
-	for (; *s; ++s)
+	for (auto k = TSeed; *k; ++k)
 	{
-		hash += *s;
-		hash += (hash << 10);
-		hash ^= (hash >> 6);
+		d ^= (d << 5) +
+			(d >> 2) + *k;
 	}
 
-	hash += (hash << 3);
-	hash ^= (hash >> 11);
-	hash += (hash << 15);
+	return d * 13 + 2904521;
+}
 
-	return hash;
+constexpr UINT64 Prng(UINT64 seed)
+{
+	const UINT64 s = seed * 6364136223846793005ULL + (seed | 1);
+	const auto x = UINT32(((s >> 18u) ^ s) >> 27u);
+	const UINT32 r = s >> 59u;
+	return (x >> r | x << (UINT32(-INT32(r)) & 31)) ^ seed;
+}
+
+constexpr unsigned StrHash(const char* key)
+{
+	UINT32 hashVal = 0;
+	constexpr auto s = Prng(Seed());
+	
+	for (; *key; ++key)
+	{
+		hashVal ^= (hashVal << 5) +
+			(hashVal >> 2) + *key;
+	}
+
+	return UINT32(hashVal * s ^ Prng(s));
 }
 
 template <typename Fn, UINT32 Hash>
@@ -50,10 +64,11 @@ Fn* LazyFn()
 	auto* const addressOfNames = PDWORD(UINT64(g::KernelBase) + imageExportDirectory->AddressOfNames);
 
 	auto* const ordinal = PWORD(UINT64(g::KernelBase) + imageExportDirectory->AddressOfNameOrdinals);
-
-	for (unsigned i = 0; i < imageExportDirectory->AddressOfFunctions; i++)
+	
+	for (unsigned i = 0; imageExportDirectory->AddressOfNames + (i * 4) < imageExportDirectory->AddressOfNameOrdinals; i++)
 	{
-		if (hash_string(PCHAR(g::KernelBase) + addressOfNames[i]) == Hash)
+		auto const key = PCHAR(g::KernelBase) + addressOfNames[i];
+		if (StrHash(key) == Hash)
 		{
 			return reinterpret_cast<Fn*>(UINT64(g::KernelBase) + address[ordinal[i]]);
 		}
@@ -68,12 +83,12 @@ __forceinline
 Fn* LazyFnCached()
 {
 	static void* cache = nullptr;
-	
+	constexpr auto s = Prng(Seed() + Hash);
 	if (cache == nullptr) {
 		auto ptr = LazyFn<Fn, Hash>();
-		cache = PVOID(UINT64(ptr) ^ (UINT64(Hash) << 32 | UINT64(seedBase)));
+		cache = PVOID(UINT64(ptr) ^ ((UINT64(Hash) << 32 | Hash) ^ s));
 		return ptr;
 	}
 
-	return reinterpret_cast<Fn*>(UINT64(cache) ^ (UINT64(Hash) << 32 | UINT64(seedBase)));
+	return reinterpret_cast<Fn*>(UINT64(cache) ^ ((UINT64(Hash) << 32 | Hash) ^ s));
 }

@@ -47,7 +47,7 @@ public:
 	bool heartbeat() const;
 
 	// Gets the address of a module in the process.
-	uint64_t get_module_base(const wchar_t* module_name) const;
+	static uint64_t get_process_base(int pid);
 
 	// Reads raw bytes from the process.
 	bool read_raw(uint64_t address, void* buffer, size_t size) const;

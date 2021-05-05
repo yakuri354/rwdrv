@@ -1,9 +1,8 @@
 #include "entity.hpp"
 
-apex::entity::entity(uintptr_t pointer, memory& mem): ptr(pointer), buffer{  }
+apex::entity::entity(uintptr_t pointer, provider& mem): ptr(pointer), buffer{  }
 {
-	mem.read_raw(reinterpret_cast<void*>(pointer), offsets::entity_size);
-	memcpy(buffer, mem.buf().first, offsets::entity_size);
+	mem.read_raw(reinterpret_cast<void*>(pointer), buffer, offsets::entity_size);
 }
 
 vector apex::entity::get_position()

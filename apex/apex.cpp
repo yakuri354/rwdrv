@@ -1,18 +1,17 @@
 #include "apex.hpp"
 
-apex::game::game(memory& mem): memory_(mem), base(0)
+apex::game::game(provider& mem): memory_(mem), base(0)
 {
 	const auto name = std::wstring(apex::name);
 	const auto pid = util::process_id(name);
-	const auto status = mem.attach(pid);
 
-	if (!pid || !status)
+	if (const auto status = mem.attach(pid); !pid || !status)
 	{
 		log("Could not find Apex");
 		throw std::exception("could not find the process");
 	}
 
-	base = mem.base(pid);
+	base = mem.base();
 	dbgLog("Game object initialized, base: [0x%llx]", base);
 }
 
@@ -46,18 +45,24 @@ void apex::game::process_entities(const entity& local_player) const
 		const auto health = entity->get_health();
 		const auto player = entity->is_player();
 		const auto pos = entity->get_position();
-		
+
 		dbgLog("health %d, player %d", health, player);
 		dbgLog("x %.6f, y %.6f, z %.6f", pos.x, pos.y, pos.z);
 
-		if (!entity->is_player() || health < 0 || health > 100) {
-			dbgLog("Invalid entity, continuing");
+		if (!player)
+		{
+			memory_.write(entity_ptr + offsets::glow::item_glow, offsets::item_glow_val);
 			continue;
 		}
+		// else if (!player || health < 0 || health > 100)
+		// {
+		// 	dbgLog("Invalid entity, continuing");
+		// 	continue;
+		// }
 
 		// TODO Something more
 
-		highlight_entity(entity->ptr, { 0.f, 3.f, 0.f }, { 101, 102, 96, 90 });
+		highlight_entity(entity->ptr, {0.f, 3.f, 0.f}, {101, 102, 96, 90});
 	}
 }
 
@@ -77,5 +82,5 @@ void apex::game::highlight_entity(uintptr_t entity, color col, glow_mode mode) c
 
 	glow_time -= 1.f;
 	memory_.write<fade>(entity + offsets::glow::fade,
-	                    { 0x34000000, 0x34000000, glow_time, glow_time, glow_time, glow_time });
+	                    {0x34000000, 0x34000000, glow_time, glow_time, glow_time, glow_time});
 }

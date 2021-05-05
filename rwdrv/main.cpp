@@ -1,13 +1,13 @@
 #define NO_DDK
 #include <ntifs.h>
 #include "common.hpp"
-#include "clear.hpp"
 #include "search.hpp"
 #include "skcrypt.hpp"
 #include "comms.hpp"
 #include "intrin.h"
 #include "exec.hpp"
 
+static_assert(_M_X64, "Only x86_64 is supported");
 
 PVOID g::KernelBase;
 
@@ -16,23 +16,26 @@ namespace g
 	::DriverState DriverState{};
 }
 
-UINT64 __fastcall HookControl(UINT64 ctlCode, UINT64 a2, UINT64 param, UINT16 magic, UINT64 a5)
+UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64 a5)
 {
-	if (magic == CTL_MAGIC || magic == INIT_MAGIC)
+	if (a4 == CTL_MAGIC)
 	{
-		return NT2CTL(ExecuteRequest(UINT32(ctlCode), magic, UINT32(param), &g::DriverState));
+		return NT2CTL(
+			ExecuteRequest(cmPtr<Control>(UINT32(a1), UINT32(a3)), &g::DriverState)
+		);
 	}
 
-	if (ctlCode >= 0xffff000000000000u)
+	if (a1 >= 0xffff000000000000u)
 	{
-		return _WmiTraceMessage(g::DriverState.Wmi.OrigPtr)(ctlCode, a2, param, magic, a5);
+		return _WmiTraceMessage(g::DriverState.Wmi.OrigPtr)(a1, a2, a3, a4, a5);
 	}
 
-	return PHookFn(g::DriverState.Syscall.OrigPtr)(UINT32(ctlCode), magic, UINT32(param));
+	return PHookFn(g::DriverState.Syscall.OrigPtr)(UINT32(a1), a4, UINT32(a3));
+	// TODO Stack overflow after running driver twice
 }
 
 
-NTSTATUS SetupHook()
+F_INLINE NTSTATUS SetupHook()
 {
 	// The outside function, first in the chain
 	// __int64 __fastcall ApiSetEditionOpenInputDesktopEntryPoint(unsigned int a1, unsigned int a2, unsigned int a3)
@@ -70,11 +73,21 @@ NTSTATUS SetupHook()
 
 	log("Realtek pointer location at [0x%p]", PVOID(rtDataPtr));
 
-	g::DriverState.Syscall.OrigPtr =
-		InterlockedExchangePointer(
-			static_cast<PVOID volatile*>(syscallDataPtr),
-			Search::RVA(rtLogFn, 1)
-		);
+	if (UINT64(Search::RVA(rtLogFn, 1)) == *PUINT64(syscallDataPtr))
+	{
+		log("Syscall is already hooked"); // TODO Proper handling of such situation
+// #ifndef DEBUG
+// 		return STATUS_UNSUCCESSFUL;
+// #endif
+		log("Pointing original syscall to other driver's dispatch. This will BSOD if the other driver is faulty.");
+		g::DriverState.Syscall.OrigPtr = *static_cast<PVOID volatile*>(rtDataPtr);
+	}
+	else
+		g::DriverState.Syscall.OrigPtr =
+			InterlockedExchangePointer(
+				static_cast<PVOID volatile*>(syscallDataPtr),
+				Search::RVA(rtLogFn, 1)
+			);
 
 	g::DriverState.Wmi.OrigPtr =
 		InterlockedExchangePointer(
@@ -84,13 +97,13 @@ NTSTATUS SetupHook()
 
 	g::DriverState.Syscall.PtrLoc = PUINT64(syscallDataPtr);
 	g::DriverState.Wmi.PtrLoc = PUINT64(rtDataPtr);
-	
+
 	log("Successfully placed hooks");
 
 	return STATUS_SUCCESS;
 }
 
-bool CheckPEImage(PVOID imgBase)
+F_INLINE bool CheckPEImage(PVOID imgBase)
 {
 	if (!imgBase)
 	{
@@ -120,10 +133,11 @@ bool CheckPEImage(PVOID imgBase)
 }
 
 
-NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
+F_INLINE NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase, ULONG tag)
 {
 	g::DriverState.BaseAddress = baseAddr;
 	g::DriverState.ImageSize = imageSize;
+	g::DriverState.Tag = tag;
 
 	const auto status = Search::SetKernelProps(kernelBase);
 	if (!NT_SUCCESS(status))
@@ -134,7 +148,7 @@ NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase)
 	return status;
 }
 
-NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
+NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, ULONG tag, PVOID kernelBase) // TODO Unload
 {
 	// Cannot use logging until g::KernelBase is set
 
@@ -142,12 +156,17 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
 	{
 		return STATUS_INVALID_PARAMETER;
 	}
-	
+
 	g::KernelBase = kernelBase;
 
-	log("Driver loaded at [0x%p]", baseAddress);
+#ifdef DEBUG
+	logRaw("\n\n\n--------------------------------------------------------\n\n");
+#endif
+	char sTag[5] = { 0 };
+	RtlCopyMemory(sTag, &tag, 4);
+	log("Driver loaded at [0x%p] | Size 0x%x | Tag '%s'", baseAddress, imageSize, sTag);
 
-	auto status = InitRoutine(baseAddress, imageSize, kernelBase);
+	auto status = InitRoutine(baseAddress, imageSize, kernelBase, tag);
 	if (!NT_SUCCESS(status))
 	{
 		log("Driver initialization routine failed.");
@@ -158,7 +177,6 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, PVOID kernelBase)
 	if (!NT_SUCCESS(status))
 	{
 		log("Failed to setup communication hook");
-		return status;
 	}
 
 	return status;

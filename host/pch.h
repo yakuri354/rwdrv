@@ -11,4 +11,6 @@
 #include "framework.h"
 #include <winternl.h>
 
+#define reca reinterpret_cast
+
 #endif //PCH_H

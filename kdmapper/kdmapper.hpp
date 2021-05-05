@@ -11,6 +11,8 @@
 #include "nt.hpp"
 #include "intel_driver.hpp"
 
+// TODO Allocate individual pages instead of a pool
+
 namespace kdmapper
 {
 	uint64_t MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver_path);
