@@ -49,7 +49,7 @@ struct DriverState
 #define F_INLINE __forceinline
 
 #ifdef DEBUG
-#define logRaw(fmt, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, fmt, ##__VA_ARGS__)
+#define logRaw(fmt, ...) C_FN(DbgPrintEx)(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, fmt, ##__VA_ARGS__)
 #define dbgLog log
 
 #define ASSERT_TRUE(exp) ASSERT(exp)

@@ -7,7 +7,7 @@
 #include "intrin.h"
 #include "exec.hpp"
 
-static_assert(sizeof(void*) == 8, "32 bit build is not supported");
+static_assert(_M_X64, "Only x86_64 is supported");
 
 PVOID g::KernelBase;
 

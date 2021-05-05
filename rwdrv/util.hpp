@@ -7,6 +7,8 @@ F_INLINE NTSTATUS GetProcessBase(HANDLE pid, OUT PVOID *address)
 {
 	PEPROCESS proc;
 
+	if (pid == nullptr) return STATUS_NOT_FOUND;
+
 	const auto status = C_FN(PsLookupProcessByProcessId)(pid, &proc);
 	
 	if (!NT_SUCCESS(status))

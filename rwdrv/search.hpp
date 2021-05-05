@@ -61,7 +61,10 @@ F_INLINE NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 
 	log("Searching through %d modules", pMods->NumberOfModules);
 
-	auto kf = false, wf = false, rf = false; // TODO Refactor & implement hashing
+	auto kf = false, wf = false, rf = false; // TODO Refactor
+
+	constexpr auto wkHash = StrHash(R"(\SystemRoot\System32\win32kbase.sys)");
+	constexpr auto rtHash = StrHash(R"(\SystemRoot\System32\drivers\rt640x64.sys)");
 
 	if (NT_SUCCESS(status))
 	{
@@ -81,8 +84,7 @@ F_INLINE NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 			}
 			if (!wf)
 			{
-				if (strcmp(PCHAR(pMod[i].FullPathName),
-				           skCrypt("\\SystemRoot\\System32\\win32kbase.sys")) == 0)
+				if (StrHash(PCHAR(pMod[i].FullPathName)) == wkHash)
 				{
 					Win32kBase = pMod[i].ImageBase;
 					Win32kSize = pMod[i].ImageSize;
@@ -92,8 +94,7 @@ F_INLINE NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 			}
 			if (!rf)
 			{
-				if (strcmp(PCHAR(pMod[i].FullPathName),
-				           skCrypt("\\SystemRoot\\System32\\drivers\\rt640x64.sys")) == 0)
+				if (StrHash(PCHAR(pMod[i].FullPathName)) == rtHash)
 				{
 					RtBase = pMod[i].ImageBase;
 					// The system module ranges are invalid

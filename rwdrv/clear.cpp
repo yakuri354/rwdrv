@@ -219,7 +219,7 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 	{
 		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
 		{
-			char tag[5] = {0};
+			char tag[5] = { 0 };
 			RtlCopyMemory(tag, &poolBigPageTable[i].Key, 4);
 			log("Found an entry in BigPoolTable: [0x%p] | Size: 0x%llX | Tag: '%s'",
 				PVOID(poolBigPageTable[i].Va),

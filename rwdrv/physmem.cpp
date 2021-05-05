@@ -7,7 +7,7 @@ UINT64 TranslateLinearAddress(UINT64 directoryTableBase, UINT64 virtualAddress);
 DWORD GetUserDirectoryTableBaseOffset()
 {
 	RTL_OSVERSIONINFOW ver = { 0 };
-	RtlGetVersion(&ver);
+	C_FN(RtlGetVersion)(&ver);
 
 	switch (ver.dwBuildNumber)
 	{
@@ -170,7 +170,7 @@ NTSTATUS Phys::ReadProcessMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size
 	const auto status = C_FN(PsLookupProcessByProcessId)(HANDLE(pid), &pProcess);
 	if (status != STATUS_SUCCESS) return status;
 
-	const auto processDirbase = C_FN(GetProcessCr3)(pProcess);
+	const auto processDirbase = GetProcessCr3(pProcess);
 	C_FN(ObfDereferenceObject)(pProcess);
 
 	SIZE_T curOffset = 0;
@@ -200,7 +200,7 @@ NTSTATUS Phys::WriteProcessMemory(HANDLE pid, PVOID Address, PVOID AllocatedBuff
 	const auto status = C_FN(PsLookupProcessByProcessId)(HANDLE(pid), &pProcess);
 	if (status != STATUS_SUCCESS) return status;
 
-	const auto processDirbase = C_FN(GetProcessCr3)(pProcess);
+	const auto processDirbase = GetProcessCr3(pProcess);
 	C_FN(ObfDereferenceObject)(pProcess);
 
 	SIZE_T curOffset = 0;
