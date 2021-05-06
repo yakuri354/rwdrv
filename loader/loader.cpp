@@ -20,7 +20,7 @@ DWORD GetProcessByNameW(std::wstring name)
 	ZeroMemory(&process, sizeof(process));
 	process.dwSize = sizeof(process);
 
-	// Walkthrough all processes.
+	// Walk through all processes.
 	if (Process32First(snapshot, &process))
 	{
 		do
@@ -43,10 +43,11 @@ DWORD GetProcessByNameW(std::wstring name)
 std::string GenRandStr(const int len)
 {
 	std::string tmp_s;
-	static const char alphanum[] =
-		"0123456789"
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		"abcdefghijklmnopqrstuvwxyz";
+	static const auto alphanum = xs(
+		"0123456789" // +
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ" // +
+		"abcdefghijklmnopqrstuvwxyz"
+	);
 
 	srand(static_cast<unsigned>(time(nullptr)) * GetCurrentProcessId());
 
@@ -158,7 +159,7 @@ bool InjectDll(std::wstring *process)
 	std::wstring name{};
 	
 	if (process == nullptr) {
-		std::cout << "[?] Where to host the dll: ";
+		std::cout << xs("[?] Where to host the dll: ");
 		std::wcin >> name;
 		proc = &name;
 	}
@@ -188,7 +189,7 @@ bool InjectDll(std::wstring *process)
 
 	const auto temp = std::filesystem::temp_directory_path();
 
-	const auto dll_name = GenRandStr(10) + ".dll";
+	const auto dll_name = GenRandStr(10) + xs(".dll");
 
 	const auto real_dll_path = temp / dll_name;
 
@@ -251,9 +252,9 @@ bool InjectDll(std::wstring *process)
 	return true;
 }
 
-bool load_driver()
+bool load_driver() // TODO Refactor kdmapper
 {
-	std::cout << "[>] Loading driver" << std::endl;
+	std::cout << xs("[>] Loading driver") << std::endl;
 	
 	auto* const iqvw64e_device_handle = intel_driver::Load();
 
@@ -356,13 +357,13 @@ PHookFn get_hook_fn()
 
 	if (dll == nullptr)
 	{
-		std::cout << "[W] Module " << xs(HOOKED_FN_MODULE) << " not loaded, attempting to load it" << std::endl;
+		std::cout << xs("[W] Module ") << xs(HOOKED_FN_MODULE) << xs(" not loaded, attempting to load it") << std::endl;
 
 		dll = LI_FN(LoadLibraryA)(xs(HOOKED_FN_MODULE));
 
 		if (dll == nullptr || dll == INVALID_HANDLE_VALUE)
 		{
-			std::cout << "[-] Could not load module, aborting" << std::endl;
+			std::cout << xs("[-] Could not load module, aborting") << std::endl;
 			return nullptr;
 		}
 	}
@@ -412,7 +413,7 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 	if (!forceReloadDrv && check_driver()) {
 		std::cout << xs("[+] Driver already loaded, injecting dll") << std::endl;
 	}
-	else if (!load_driver())
+	else if (!load_driver()) // TODO Change mapper
 	{
 		std::cout << xs("[-] Failed to load driver") << std::endl;
 		return 1;
@@ -453,7 +454,7 @@ int main(int argc, char* argv[])
 
 	if (GetConsoleProcessList(nullptr, 0) == 1)
 	{
-		system("pause");
+		system(xs("pause"));
 	}
 
 	return result;

@@ -1,8 +1,7 @@
 #include "pch.h"
 #include "test.h"
 
-
-void test(hoster host) // TODO Fix VirtQuery, writing, finish test
+void test(hoster host)
 {
 	host.logger(xs("Starting test\n"));
 
@@ -10,14 +9,14 @@ void test(hoster host) // TODO Fix VirtQuery, writing, finish test
 	host.mem.attach(pid);
 	const auto base = host.mem.base();
 
-	host.logger(fmt::format(xs("Attached; PID {}, Base {}\n"), pid, reca<void*>(base)).c_str());
+	host.logH(xs("Attached; PID %u; Base 0x%p\n"), pid, base);
 
 	uint64_t time = 0;
-	for (auto i = 0; i < 10; i++)
+	for (uint32_t i = 0; i < 10; i++)
 	{
 		LARGE_INTEGER then;
 		LI_FN(QueryPerformanceCounter)(&then);
-		for (auto i = 0; i < 10000; i++)
+		for (uint32_t j = 0; j < 10000; j++)
 		{
 			uint32_t value = 0xDEADBEEF;
 			host.mem.write(base, value);
@@ -29,13 +28,11 @@ void test(hoster host) // TODO Fix VirtQuery, writing, finish test
 		LARGE_INTEGER tick_rate;
 		LI_FN(QueryPerformanceFrequency)(&tick_rate);
 
-		auto elapsed = (now.QuadPart - then.QuadPart) * tick_rate.QuadPart / 1000000Ui64;
+		const auto elapsed = (now.QuadPart - then.QuadPart) * tick_rate.QuadPart / 1000000Ui64;
 		time += elapsed;
 
-		host.logger(fmt::format(xs("Completed test run #{} in {} us\n"), i + 1, elapsed).c_str());
+		host.logH(xs("Completed test run #%u in %llu us\n"), i + 1, elapsed);
 	}
 
-	host.logger(
-		fmt::format(xs("Test completed successfully, each r/w operation took {} us in average\n"), time / 100000).
-		c_str());
+	host.logH(xs("Test completed successfully, each r/w operation took %llu us in average\n"), time / (10 * 10000));
 }

@@ -3,8 +3,6 @@
 #define NO_DDK
 #include "common.hpp"
 
-// TODO Great refactor of pasted code
-
 namespace Clear
 {
 	NTSTATUS ClearSystemBigPoolInfo(PVOID pageAddr);

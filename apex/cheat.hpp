@@ -1,10 +1,8 @@
 #pragma once
 #include <memory>
+#include "../loader/xorstr.hpp"
 #include "../host/provider.hpp"
+#include "../host/hoster.hpp"
 #include "../host/util.hpp"
 
-namespace cheat
-{
-	void run(provider& mem);
-}
-
+void cheat(const hoster& mem);

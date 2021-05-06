@@ -32,8 +32,7 @@ constexpr UINT64 Prng(UINT64 seed)
 	const UINT32 r = s >> 59u;
 	return (x >> r | x << (UINT32(-INT32(r)) & 31)) ^ seed;
 }
-
-constexpr unsigned StrHash(const char* key)
+__forceinline constexpr unsigned StrHash(const char* key)
 {
 	UINT32 hashVal = 0;
 	constexpr auto s = Prng(Seed());

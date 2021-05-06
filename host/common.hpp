@@ -12,5 +12,4 @@
 #endif
 
 #define log(fmt, ...) {char cad[512]; sprintf_s(cad, xs("[umc] " fmt "\n"), ##__VA_ARGS__); LI_FN(OutputDebugStringA)(cad);}(1)
-#define logF(sFmt, ...) { fmt::memory_buffer b; fmt::format_to(b, xs("[umc] " sFmt "\n")); LI_FN(OutputDebugStringA)(); }(1)
 // #define log(...) printf_s(__VA_ARGS__)

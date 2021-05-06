@@ -10,6 +10,9 @@
 // Добавьте сюда заголовочные файлы для предварительной компиляции
 #include "framework.h"
 #include <winternl.h>
+#include <cstdio>
+#include "../loader/xorstr.hpp"
+#include "lazy_importer.hpp"
 
 #define reca reinterpret_cast
 

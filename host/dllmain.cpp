@@ -1,13 +1,16 @@
-﻿// dllmain.cpp : Определяет точку входа для приложения DLL.
-#include "pch.h"
+﻿#include "pch.h"
 #include <random>
-#include "lazy_importer.hpp"
 #include "../rwdrv/comms.hpp"
 #include <iostream>
 #include "common.hpp"
-// #include "../apexbot/apexbot.hpp"
-#include "test.h"
+#include "hoster.hpp"
 #include "provider.hpp"
+#ifdef TEST_RUN
+#include "test.h"
+#else
+#include "../apex/cheat.hpp"
+#endif
+
 
 struct host_state
 {
@@ -61,8 +64,6 @@ bool cleanup()
 	return true;
 }
 
-void format(const char* str);
-
 DWORD WINAPI real_main(void* param)
 {
 	log("Starting initialization");
@@ -113,8 +114,11 @@ DWORD WINAPI real_main(void* param)
 			}
 		};
 
-		// cheat(host); // TODO cheat
+#ifdef TEST_RUN
 		test(host);
+#else
+		cheat(host);
+#endif
 	} catch (std::exception &e)
 	{
 		log("An unhandled exception occured: %s", e.what());

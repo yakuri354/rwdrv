@@ -31,7 +31,6 @@ UINT64 __fastcall HookControl(UINT64 a1, UINT64 a2, UINT64 a3, UINT16 a4, UINT64
 	}
 
 	return PHookFn(g::DriverState.Syscall.OrigPtr)(UINT32(a1), a4, UINT32(a3));
-	// TODO Stack overflow after running driver twice
 }
 
 

@@ -277,6 +277,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="common.hpp" />
+    <ClInclude Include="dbg.hpp" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="hoster.hpp" />
     <ClInclude Include="hostframework.h" />
@@ -298,6 +299,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DbgRelease|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="test.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\apex\apex.vcxproj">
+      <Project>{d8d0f07a-61f8-44e3-98a3-ebdd349d26e3}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

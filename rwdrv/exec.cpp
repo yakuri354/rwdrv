@@ -32,7 +32,7 @@ NTSTATUS ExecuteRequest(Control* ctl, DriverState* driverState)
 	case Ctl::PHYS_MEMCPY:
 		return C_FN(MmCopyMemory)(ctl->Target, *reinterpret_cast<MM_COPY_ADDRESS*>(&ctl->Source),
 		                          ctl->Size, MM_COPY_MEMORY_PHYSICAL, &ctl->Result);
-	case Ctl::VIRT_READ: // TODO VIRT_MEMCPY instead of this abomination
+	case Ctl::VIRT_READ:
 #if USE_PHYSMEM
 		return Phys::ReadProcessMemory(HANDLE(ctl->Pid), ctl->Source, ctl->Target, ctl->Size, &ctl->Result);
 #else

@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "common.hpp"
 #include "provider.hpp"
 
 driver::driver(const driver_handle& driver): drv(driver), ctl()
@@ -26,7 +27,7 @@ bool driver::attach(uint32_t pid)
 	return true; // TODO Test for validity
 }
 
-bool driver::read_raw(const void* addr, void* buf, const size_t size) // TODO Unified memcpy
+bool driver::read_raw(const void* addr, void* buf, const size_t size)
 {
 	ctl.CtlCode = Ctl::VIRT_READ;
 	ctl.Source = const_cast<void*>(addr);

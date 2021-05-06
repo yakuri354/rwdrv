@@ -42,6 +42,9 @@
     <ClInclude Include="test.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="dbg.hpp">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

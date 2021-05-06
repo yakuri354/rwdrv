@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
-#include <fmt/printf.h>
-#include "common.hpp"
+#include <exception>
+#include "pch.h"
 #include "../rwdrv/comms.hpp"
 
 typedef uint64_t (drv_ctl_t)(uint32_t a1, uint32_t a2);	
@@ -71,7 +71,6 @@ T provider::read(void* addr)
 	
 	if (!read_raw(addr, &local, sizeof(T)))
 	{
-		log("Value read failed");
 		throw std::exception("read failed");
 	}
 
@@ -87,24 +86,8 @@ T provider::read(const uintptr_t addr)
 template <typename T>
 void provider::write(void* addr, const T& value)
 {
-// #ifdef _DEBUG
-// 	fmt::memory_buffer out;
-// 	if constexpr (std::is_same<T, int>::value
-// 		|| std::is_same<T, uintptr_t>::value
-// 		|| std::is_same<T, float>::value)
-// 	{
-// 		format_to(out, "\t\tWriting {} to {}\n", value, addr);
-// 	}
-// 	else
-// 	{
-// 		format_to(out, "\t\tWriting a {} to {}\n", typeid(T).name(), addr);
-// 	}
-// 	LI_FN(OutputDebugStringA)(out.data());
-// #endif
-
 	if (!write_raw(addr, reinterpret_cast<const void*>(&value), sizeof(T)))
 	{
-		log("Value write failed");
 		throw std::exception("write failed");
 	}
 }

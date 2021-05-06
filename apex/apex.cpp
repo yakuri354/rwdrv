@@ -7,8 +7,7 @@ apex::game::game(provider& mem): memory_(mem), base(0)
 
 	if (const auto status = mem.attach(pid); !pid || !status)
 	{
-		log("Could not find Apex");
-		throw std::exception("could not find the process");
+		throw std::exception(xs("could not find apex game process"));
 	}
 
 	base = mem.base();
