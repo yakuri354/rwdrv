@@ -1,6 +1,6 @@
 #include "entity.hpp"
 
-apex::entity::entity(uintptr_t pointer, provider& mem): ptr(pointer), buffer{  }
+apex::entity::entity(uintptr_t pointer, provider& mem): ptr(pointer), buffer{ 0 }
 {
 	mem.read_raw(reinterpret_cast<void*>(pointer), buffer, offsets::entity_size);
 }

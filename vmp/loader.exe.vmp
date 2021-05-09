@@ -36,11 +36,12 @@
             <Procedure MapAddress="`portable_executable::GetImports&apos;::`1&apos;::dtor$4" IncludedInCompilation="0" Options="0" CompilationType="1" />
             <Procedure MapAddress="portable_executable::GetRelocs(void *)" Options="0" CompilationType="1" />
             <Procedure MapAddress="portable_executable::GetImports(void *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="check_serivice(void)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="check_serivice(void)" Options="0" CompilationType="1" />
             <Procedure MapAddress="main" Options="0" CompilationType="2" />
             <Procedure MapAddress="InjectDll(class std::basic_string&lt;wchar_t,struct std::char_traits&lt;wchar_t&gt;,class std::allocator&lt;wchar_t&gt; &gt; *)" Options="0" CompilationType="2" />
             <Procedure MapAddress="GetProcessByNameW(class std::basic_string&lt;wchar_t,struct std::char_traits&lt;wchar_t&gt;,class std::allocator&lt;wchar_t&gt; &gt;)" Options="0" CompilationType="2" />
             <Procedure MapAddress="load_driver(void)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="intel_driver::FreePool(void *,unsigned __int64)" Options="0" CompilationType="1" />
         </Procedures>
         <Objects />
     </Protection>

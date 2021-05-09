@@ -6,7 +6,7 @@
 
 namespace util
 {
-	inline uint32_t process_id(const std::wstring& name)
+	inline uint32_t process_id(const wchar_t* name)
 	{
 		PROCESSENTRY32 process_info;
 		process_info.dwSize = sizeof(process_info);
@@ -18,23 +18,17 @@ namespace util
 		}
 
 		Process32First(proc_snapshot, &process_info);
-		if (name == process_info.szExeFile)
+		do
 		{
-			CloseHandle(proc_snapshot);
-			return process_info.th32ProcessID;
-		}
-
-		while (Process32Next(proc_snapshot, &process_info))
-		{
-			if (name == process_info.szExeFile)
+			if (wcscmp(name, process_info.szExeFile) == 0)
 			{
 				CloseHandle(proc_snapshot);
 				return process_info.th32ProcessID;
 			}
-		}
+		} while (Process32Next(proc_snapshot, &process_info));
 
 		CloseHandle(proc_snapshot);
-		return 0;
+		throw ex::process_not_found();
 	}
 
 	template <class T>

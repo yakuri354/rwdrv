@@ -131,7 +131,7 @@ std::wstring GetLastErrorAsStringW()
 	return message;
 }
 
-bool InjectDll(std::wstring *process)
+bool InjectDll(std::wstring* process)
 {
 	// TODO Embed encrypted dll in loader
 
@@ -157,8 +157,9 @@ bool InjectDll(std::wstring *process)
 	// }
 	std::wstring* proc;
 	std::wstring name{};
-	
-	if (process == nullptr) {
+
+	if (process == nullptr)
+	{
 		std::cout << xs("[?] Where to host the dll: ");
 		std::wcin >> name;
 		proc = &name;
@@ -255,7 +256,7 @@ bool InjectDll(std::wstring *process)
 bool load_driver() // TODO Refactor kdmapper
 {
 	std::cout << xs("[>] Loading driver") << std::endl;
-	
+
 	auto* const iqvw64e_device_handle = intel_driver::Load();
 
 	if (!iqvw64e_device_handle || iqvw64e_device_handle == INVALID_HANDLE_VALUE)
@@ -290,7 +291,7 @@ bool check_serivice()
 	DWORD servicesCount{};
 	DWORD resumeHandle{};
 
-	std::cout << xs("[>] Checking for BattlEye service") << std::endl;
+	std::cout << xs("[>] Checking for AC services") << std::endl;
 
 	const auto sc_handle = OpenSCManagerA(nullptr,
 	                                      nullptr, SC_MANAGER_ENUMERATE_SERVICE);
@@ -301,7 +302,7 @@ bool check_serivice()
 		return false;
 	}
 
-	(void) EnumServicesStatusExW(
+	(void)EnumServicesStatusExW(
 		sc_handle,
 		SC_ENUM_PROCESS_INFO,
 		SERVICE_WIN32,
@@ -321,7 +322,7 @@ bool check_serivice()
 	}
 
 	auto* const svcBuf = new BYTE[servicesBufSize];
-	
+
 	if (!EnumServicesStatusExW(
 		sc_handle,
 		SC_ENUM_PROCESS_INFO,
@@ -343,7 +344,12 @@ bool check_serivice()
 	{
 		if (wcsstr(LPENUM_SERVICE_STATUS_PROCESSW(svcBuf)[i].lpServiceName, xs(L"BEService")))
 		{
-			std::cout << xs("[-] BEService is running, close the game before loading the cheat.") << std::endl;
+			std::cout << xs("[-] BE is running, close all protected games before loading the cheat.") << std::endl;
+			return false;
+		}
+		if (wcsstr(LPENUM_SERVICE_STATUS_PROCESSW(svcBuf)[i].lpServiceName, xs(L"EasyAntiCheat")))
+		{
+			std::cout << xs("[-] EAC is running, close all protected games before loading the cheat.") << std::endl;
 			return false;
 		}
 	}
@@ -371,7 +377,8 @@ PHookFn get_hook_fn()
 	return LI_FN_MANUAL(HOOKED_FN_NAME, PHookFn).in_safe(dll);
 }
 
-bool check_driver() {
+bool check_driver()
+{
 	const auto sysCall = get_hook_fn();
 	if (!sysCall)
 	{
@@ -410,7 +417,8 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 
 	std::cout << xs("[+] BE service not found") << std::endl;
 
-	if (!forceReloadDrv && check_driver()) {
+	if (!forceReloadDrv && check_driver())
+	{
 		std::cout << xs("[+] Driver already loaded, injecting dll") << std::endl;
 	}
 	else if (!load_driver()) // TODO Change mapper
@@ -435,13 +443,14 @@ int main(int argc, char* argv[])
 	bool force_reload = false;
 	std::wstring proc;
 	std::wstring* p_proc = nullptr;
-	
+
 	for (auto i = 0; i < argc; i++)
 	{
 		if (!strcmp(argv[i], xs("--forcereload")))
 		{
 			force_reload = true;
-		} else if (!strcmp(argv[i], xs("--process")) && argc >= i + 2)
+		}
+		else if (!strcmp(argv[i], xs("--process")) && argc >= i + 2)
 		{
 			std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter{};
 			proc = converter.from_bytes(argv[i + 1]);

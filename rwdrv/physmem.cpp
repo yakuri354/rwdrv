@@ -71,7 +71,7 @@ NTSTATUS Phys::ReadPhysicalAddress(PVOID TargetAddress, PVOID lpBuffer, SIZE_T S
 NTSTATUS Phys::WritePhysicalAddress(PVOID targetAddress, PVOID lpBuffer, SIZE_T Size, SIZE_T* BytesWritten)
 {
 	if (!targetAddress)
-		return STATUS_UNSUCCESSFUL;
+		return STATUS_PARTIAL_COPY; // TODO ugly
 
 	PHYSICAL_ADDRESS AddrToWrite = { 0 };
 	AddrToWrite.QuadPart = UINT64(targetAddress);
@@ -79,7 +79,7 @@ NTSTATUS Phys::WritePhysicalAddress(PVOID targetAddress, PVOID lpBuffer, SIZE_T 
 	auto* const pmappedMem = C_FN(MmMapIoSpaceEx)(AddrToWrite, Size, PAGE_READWRITE);
 
 	if (!pmappedMem)
-		return STATUS_UNSUCCESSFUL;
+		return STATUS_PARTIAL_COPY;
 
 	memcpy(pmappedMem, lpBuffer, Size);
 
@@ -161,14 +161,13 @@ UINT64 TranslateLinearAddress(UINT64 directoryTableBase, UINT64 virtualAddress)
 }
 
 
-//
+
 NTSTATUS Phys::ReadProcessMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, SIZE_T* read)
 {
-	PEPROCESS pProcess = nullptr;
-	if (pid == 0) return STATUS_UNSUCCESSFUL;
+	PEPROCESS pProcess{};
 
 	const auto status = C_FN(PsLookupProcessByProcessId)(HANDLE(pid), &pProcess);
-	if (status != STATUS_SUCCESS) return status;
+	if (status != STATUS_SUCCESS) return STATUS_NOT_FOUND;
 
 	const auto processDirbase = GetProcessCr3(pProcess);
 	C_FN(ObfDereferenceObject)(pProcess);
@@ -178,7 +177,7 @@ NTSTATUS Phys::ReadProcessMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size
 	while (totalSize)
 	{
 		const auto curPhysAddr = TranslateLinearAddress(processDirbase, ULONG64(va) + curOffset);
-		if (!curPhysAddr) return STATUS_UNSUCCESSFUL;
+		if (!curPhysAddr) return STATUS_PARTIAL_COPY;
 
 		auto readSize = min(PAGE_SIZE - (curPhysAddr & 0xFFF), totalSize);
 		const auto ntRet = ReadPhysicalAddress(PVOID(curPhysAddr), PVOID(ULONG64(buffer) + curOffset), readSize,
@@ -195,10 +194,9 @@ NTSTATUS Phys::ReadProcessMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size
 NTSTATUS Phys::WriteProcessMemory(HANDLE pid, PVOID Address, PVOID AllocatedBuffer, SIZE_T size, SIZE_T* written)
 {
 	PEPROCESS pProcess{};
-	if (pid == 0) return STATUS_UNSUCCESSFUL;
 
 	const auto status = C_FN(PsLookupProcessByProcessId)(HANDLE(pid), &pProcess);
-	if (status != STATUS_SUCCESS) return status;
+	if (status != STATUS_SUCCESS) return STATUS_NOT_FOUND;
 
 	const auto processDirbase = GetProcessCr3(pProcess);
 	C_FN(ObfDereferenceObject)(pProcess);
@@ -208,7 +206,7 @@ NTSTATUS Phys::WriteProcessMemory(HANDLE pid, PVOID Address, PVOID AllocatedBuff
 	while (totalSize)
 	{
 		const auto curPhysAddr = TranslateLinearAddress(processDirbase, ULONG64(Address) + curOffset);
-		if (!curPhysAddr) return STATUS_UNSUCCESSFUL;
+		if (!curPhysAddr) return STATUS_PARTIAL_COPY;
 
 		auto writtenSize = min(PAGE_SIZE - (curPhysAddr & 0xFFF), totalSize);
 		const auto ntRet = WritePhysicalAddress(PVOID(curPhysAddr), PVOID(ULONG64(AllocatedBuffer) + curOffset),

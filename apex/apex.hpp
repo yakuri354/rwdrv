@@ -6,10 +6,10 @@
 #include <cstdint>
 #include <memory>
 
-namespace apex {
+#define APEX_NAME xs(L"EasyAntiCheat_launcher.exe")
 
-	inline auto name = xs(L"EasyAntiCheat_launcher.exe"); // r5apex
-	constexpr auto entity_count = 100;
+namespace apex {
+	constexpr auto entity_count = 100; // 0x10000 ?
 
 	struct glow_mode
 	{
@@ -42,7 +42,9 @@ namespace apex {
 		void highlight_entity(uintptr_t entity, color col, glow_mode mode) const;
 
 		uintptr_t base;
+	
 	private:
-		provider& memory_;
+		
+		provider& mem;
 	};
 }

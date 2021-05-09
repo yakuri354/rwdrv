@@ -35,6 +35,19 @@ namespace Ctl
 	CTLCODE PHYS_MEMCPY = 0x40;
 }
 
+#ifndef STATUS_UNSUCCESSFUL
+#define STATUS_UNSUCCESSFUL              ((NTSTATUS)0xC0000001L)
+#define STATUS_PARTIAL_COPY              ((NTSTATUS)0x8000000DL)
+#define STATUS_NOT_FOUND                 ((NTSTATUS)0xC0000225L)
+#endif
+
+namespace Err
+{
+	CTLCODE UNKNOWN = unsigned(STATUS_UNSUCCESSFUL);
+	CTLCODE NOT_FOUND = unsigned(STATUS_NOT_FOUND);
+	CTLCODE MEM_ERROR = unsigned(STATUS_PARTIAL_COPY);
+}
+
 inline unsigned __int64 NT2CTL(unsigned long status)
 {
 	return CTLSTATUSBASE + status;

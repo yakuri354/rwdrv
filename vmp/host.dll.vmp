@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Document Version="2">
+    <Protection InputFileName="host.dll" Options="857032">
+        <Messages />
+        <Folders />
+        <Procedures>
+            <Procedure MapAddress="real_main(void *)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="driver_ctl(unsigned int,unsigned int)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="cleanup(void)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="DllMain" Options="0" CompilationType="1" />
+            <Procedure MapAddress="hoster::logH&lt;unsigned int,unsigned __int64&gt;(char const *,unsigned int,unsigned __int64)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="driver::attach(unsigned int)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="driver::write_raw(void *,void const *,unsigned __int64)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="driver::base(void)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="driver::read_raw(void const *,void *,unsigned __int64)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="&lt;lambda_2bd3fa3c0b6a2ed75d553ecb05d9b653&gt;::&lt;lambda_invoker_cdecl&gt;" Options="0" CompilationType="1" />
+        </Procedures>
+        <Objects />
+    </Protection>
+    <DLLBox>
+        <Folders />
+    </DLLBox>
+    <Script />
+    <LicenseManager />
+</Document>

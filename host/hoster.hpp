@@ -14,9 +14,11 @@ struct hoster
 	void logH(const char* fmt, A... args) const
 	{
 		auto const needed = snprintf(nullptr, 0, fmt, args...);
-		const auto cad = PCHAR(_malloca(needed + 1));
+		const auto cad = PCHAR(_malloca(size_t(needed) + 2Ui64));
 		if (cad == nullptr) throw std::exception("not enough stack space for string formatting");
-		snprintf(cad, needed + 1, fmt, args...); 
+		snprintf(cad, size_t(needed) + 1Ui64, fmt, args...);
+		cad[needed] = '\n';
+		cad[needed + 1] = NULL;
 		logger(cad);
 	}
 

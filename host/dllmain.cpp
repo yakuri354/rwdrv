@@ -103,9 +103,9 @@ DWORD WINAPI real_main(void* param)
 
 	log("Starting cheat");
 
-	try {
-
-		driver mem{ driver_handle{&driver_ctl} };
+	try
+	{
+		driver mem{driver_handle{&driver_ctl}};
 
 		const hoster host{
 			mem, [](const char* str)
@@ -119,7 +119,8 @@ DWORD WINAPI real_main(void* param)
 #else
 		cheat(host);
 #endif
-	} catch (std::exception &e)
+	}
+	catch (std::exception& e)
 	{
 		log("An unhandled exception occured: %s", e.what());
 	} catch (...)

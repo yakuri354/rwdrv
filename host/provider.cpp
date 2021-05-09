@@ -20,43 +20,59 @@ uintptr_t driver::base()
 	return ctl.Result;
 }
 
-bool driver::attach(uint32_t pid)
+void driver::attach(uint32_t pid)
 {
+	if (pid == 0)
+	{
+		throw ex::process_not_found();
+	}
 	log("Attached to process %u", pid);
 	ctl.Pid = pid;
-	return true; // TODO Test for validity
+	// TODO Test for validity
 }
 
-bool driver::read_raw(const void* addr, void* buf, const size_t size)
+void driver::read_raw(const void* addr, void* buf, const size_t size)
 {
 	ctl.CtlCode = Ctl::VIRT_READ;
 	ctl.Source = const_cast<void*>(addr);
 	ctl.Target = buf;
 	ctl.Size = size;
-	
-	const auto status = send_req();
-	if (!CTL_SUCCESS(status))
-	{
-		log("Read at [0x%p] failed: 0x%x", addr, NTSTATUS(status));
-		return false;
-	}
 
-	return true;
+	if (const auto status = send_req(); !CTL_SUCCESS(status))
+	{
+		//log("Read at [0x%p] failed: 0x%x", addr, NTSTATUS(status));
+		switch (NTSTATUS(status))
+		{
+		case Err::MEM_ERROR:
+			throw ex::invalid_memory_access{ addr };
+		case Err::NOT_FOUND:
+			throw ex::process_not_found();
+		case Err::UNKNOWN:
+		default:
+			throw ex::driver_error(NTSTATUS(status));
+		}
+	}
 }
 
-bool driver::write_raw(void* addr, const void* buf, const size_t size)
+void driver::write_raw(void* addr, const void* buf, const size_t size)
 {
 	ctl.CtlCode = Ctl::VIRT_WRITE;
 	ctl.Source = const_cast<void*>(buf);
 	ctl.Target = addr;
 	ctl.Size = size;
 
-	const auto status = send_req();
-	if (!CTL_SUCCESS(status))
+	if (const auto status = send_req(); !CTL_SUCCESS(status))
 	{
-		log("Write at [0x%p] failed: 0x%x", addr, NTSTATUS(status));
-		return false;
+		//log("Write at [0x%p] failed: 0x%x", addr, NTSTATUS(status));
+		switch (NTSTATUS(status))
+		{
+		case Err::MEM_ERROR:
+			throw ex::invalid_memory_access{ addr };
+		case Err::NOT_FOUND:
+			throw ex::process_not_found();
+		case Err::UNKNOWN:
+		default:
+			throw ex::driver_error(NTSTATUS(status));
+		}
 	}
-
-	return true;
 }
