@@ -7,9 +7,12 @@
 #include "intrin.h"
 #include "exec.hpp"
 
-static_assert(_M_X64, "Only x86_64 is supported");
+static_assert(_M_X64, "Only x86_64 is supported");;
 
-PVOID g::KernelBase;
+Module g::Kernel{};
+Module g::Win32k{};
+Module g::Realtek{};
+Module g::CIdll{};
 
 namespace g
 {
@@ -39,8 +42,8 @@ F_INLINE NTSTATUS SetupHook()
 	// The outside function, first in the chain
 	// __int64 __fastcall ApiSetEditionOpenInputDesktopEntryPoint(unsigned int a1, unsigned int a2, unsigned int a3)
 	const auto syscall = Search::FindPattern(
-		UINT64(Search::Win32kBase),
-		Search::Win32kSize,
+		UINT64(g::Win32k.Base),
+		g::Win32k.Size,
 		PUCHAR(PCHAR(skCrypt("\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x10\x44\x8B\xC7\x8B\xD6\x8B\xCD"))),
 		PCHAR(skCrypt("xxx????xxxxxxxxxxxx"))
 	);
@@ -56,8 +59,8 @@ F_INLINE NTSTATUS SetupHook()
 	log("Syscall pointer location at [0x%p]", PVOID(syscallDataPtr));
 
 	const auto rtLogFn = Search::FindPattern(
-		UINT64(Search::RtBase),
-		Search::RtSize,
+		UINT64(g::Realtek.Base),
+		g::Realtek.Size,
 		PUCHAR(PCHAR(skCrypt("\xE8\x00\x00\x00\x00\x4C\x8D\x5C\x24\x70\x8B\xC3"))),
 		PCHAR(skCrypt("x????xxxxxxx"))
 	);
@@ -132,13 +135,13 @@ F_INLINE bool CheckPEImage(PVOID imgBase)
 }
 
 
-F_INLINE NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase, ULONG tag)
+F_INLINE NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, ULONG tag)
 {
 	g::DriverState.BaseAddress = baseAddr;
 	g::DriverState.ImageSize = imageSize;
 	g::DriverState.Tag = tag;
 
-	const auto status = Search::SetKernelProps(kernelBase);
+	const auto status = Search::FindModules();
 	if (!NT_SUCCESS(status))
 	{
 		log("Failed to obtain kernel modules");
@@ -149,14 +152,14 @@ F_INLINE NTSTATUS InitRoutine(PVOID baseAddr, ULONG imageSize, PVOID kernelBase,
 
 NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, ULONG tag, PVOID kernelBase) // TODO Unload
 {
-	// Cannot use logging until g::KernelBase is set
+	// Cannot use logging until g::Kernel.Base is set
 
 	if (!CheckPEImage(kernelBase))
 	{
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	g::KernelBase = kernelBase;
+	g::Kernel.Base = kernelBase;
 
 #ifdef DEBUG
 	logRaw("\n\n\n--------------------------------------------------------\n\n");
@@ -165,7 +168,7 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, ULONG tag, PVOID kernel
 	RtlCopyMemory(sTag, &tag, 4);
 	log("Driver loaded at [0x%p] | Size 0x%x | Tag '%s'", baseAddress, imageSize, sTag);
 
-	auto status = InitRoutine(baseAddress, imageSize, kernelBase, tag);
+	auto status = InitRoutine(baseAddress, imageSize, tag);
 	if (!NT_SUCCESS(status))
 	{
 		log("Driver initialization routine failed.");

@@ -1,30 +1,17 @@
 #include "search.hpp"
 #include "skcrypt.hpp"
 
-PVOID Search::KernelBase = nullptr;
-ULONG Search::KernelSize = 0;
-PVOID Search::Win32kBase = nullptr;
-ULONG Search::Win32kSize = 0;
-PVOID Search::RtBase = nullptr;
-ULONG Search::RtSize = 0;
-
 #undef F_INLINE
 #define F_INLINE
 
-F_INLINE NTSTATUS Search::SetKernelProps(PVOID kernelBase)
+F_INLINE NTSTATUS Search::FindModules()
 {
 	ULONG bytes = 0;
 
-	if (KernelBase != nullptr && KernelSize != 0
-		&& Win32kBase != nullptr && Win32kSize != 0)
-	{
-		return STATUS_SUCCESS;
-	}
-
 	auto status = C_FN(ZwQuerySystemInformation)(SystemModuleInformation, nullptr, bytes, &bytes);
-	if (bytes == 0)
+	if (!NT_SUCCESS(status))
 	{
-		log("Invalid SystemModuleInformation size");
+		log("ZwQuerySystemInformation failed with code 0x%x", status);
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -33,6 +20,7 @@ F_INLINE NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 
 	if (pMods == nullptr)
 	{
+		log("Alloc failed");
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -40,77 +28,62 @@ F_INLINE NTSTATUS Search::SetKernelProps(PVOID kernelBase)
 
 	status = C_FN(ZwQuerySystemInformation)(SystemModuleInformation, pMods, bytes, &bytes);
 
+	if (!NT_SUCCESS(status))
+	{
+		C_FN(ExFreePoolWithTag)(pMods, BB_POOL_TAG);
+		log("ZwQuerySystemInformation failed with code 0x%x", status);
+		return STATUS_UNSUCCESSFUL;
+	}
+
 	log("Searching through %d modules", pMods->NumberOfModules);
 
-	auto kf = false, wf = false, rf = false; // TODO Refactor
+	bool win32k{}, realtek{}, cidll{}; // TODO Refactor
 
 	constexpr auto wkHash = StrHash(R"(\SystemRoot\System32\win32kbase.sys)");
 	constexpr auto rtHash = StrHash(R"(\SystemRoot\System32\drivers\rt640x64.sys)");
+	constexpr auto ciHash = StrHash(R"(\SystemRoot\System32\ci.dll)");
 
-	if (NT_SUCCESS(status))
+	auto* const pMod = pMods->Modules;
+
+	g::Kernel.Size = pMod->ImageSize;
+
+	for (ULONG i = 1; i < pMods->NumberOfModules; i++)
 	{
-		auto* const pMod = pMods->Modules;
-
-		for (ULONG i = 0; i < pMods->NumberOfModules; i++)
+		switch (StrHash(PCHAR(pMod[i].FullPathName)))
 		{
-			if (!kf)
-			{
-				if (pMod[i].ImageBase == kernelBase)
-				{
-					KernelBase = pMod[i].ImageBase;
-					KernelSize = pMod[i].ImageSize;
-					kf = true;
-					continue;
-				}
-			}
-			if (!wf)
-			{
-				if (StrHash(PCHAR(pMod[i].FullPathName)) == wkHash)
-				{
-					Win32kBase = pMod[i].ImageBase;
-					Win32kSize = pMod[i].ImageSize;
-					wf = true;
-					continue;
-				}
-			}
-			if (!rf)
-			{
-				if (StrHash(PCHAR(pMod[i].FullPathName)) == rtHash)
-				{
-					RtBase = pMod[i].ImageBase;
-					// The system module ranges are invalid
-					if (pMod[i].ImageSize == 0x111000) RtSize = 0x108F46;
-					else
-					{
-						log("Unsupported version of realtek driver");
-						continue;
-					}
-					rf = true;
-					continue;
-				}
-			}
-			if (kf && wf && rf)
-			{
-				break;
-			}
+		case wkHash:
+			g::Win32k.Base = pMod[i].ImageBase;
+			g::Win32k.Size = pMod[i].ImageSize;
+			win32k = true;
+			break;
+		case rtHash:
+			g::Realtek.Base = pMod[i].ImageBase;
+			g::Realtek.Size = pMod[i].ImageSize;
+			realtek = true;
+			break;
+		case ciHash:
+			g::CIdll.Base = pMod[i].ImageBase;
+			g::CIdll.Size = pMod[i].ImageSize;
+			cidll = true;
+			break;
+		default:;
 		}
 	}
 
-	if (pMods)
-	{
-		C_FN(ExFreePoolWithTag)(pMods, BB_POOL_TAG);
-	}
 
-	if (!wf || !kf || !rf)
+	C_FN(ExFreePoolWithTag)(pMods, BB_POOL_TAG);
+
+	if (!win32k || !realtek | !cidll)
 	{
-		log("Could not find base addresses of modules; kernel: %d; win32kbase: %d; rt640: %d", kf, wf, rf);
+		log("Could not find base addresses of modules; win32kbase: %d; rt640: %d, cidll: %d", win32k, realtek, cidll);
 		return STATUS_NOT_FOUND;
 	}
 
-	log("KernelBase: [0x%p]", KernelBase);
-	log("Win32kBase: [0x%p]", Win32kBase);
-	log("RtBase: [0x%p]", RtBase);
-	log("RtSize: [0x%x]", RtSize);
+	log("Kernel  Base: [0x%p]", g::Kernel.Base);
+	log("Win32k  Base: [0x%p]", g::Win32k.Base);
+	log("Ci.dll  Base: [0x%p]", g::CIdll.Base);
+	log("Realtek Base: [0x%p]", g::Realtek.Base);
+	log("Realtek Size: [0x%x]", g::Realtek.Size);
 	return STATUS_SUCCESS;
 }
 
@@ -120,15 +93,14 @@ F_INLINE PVOID Search::RVA(
 )
 {
 	const auto ripOffset = *PLONG(instruction + offset);
-	auto* const resolvedAddress = PVOID(instruction + offset + 4 + ripOffset);
 
-	return resolvedAddress;
+	return PVOID(instruction + offset + sizeof(LONG) + ripOffset);
 }
 
 F_INLINE PVOID Search::ResolveEnclosingSig(UINT64 callAddress, UINT movOffset)
 {
-	const auto targetFn = UINT64(Search::RVA(callAddress, 1));
-	return Search::RVA(targetFn + movOffset, 3);
+	const auto targetFn = UINT64(RVA(callAddress, 1));
+	return RVA(targetFn + movOffset, 3);
 }
 
 

@@ -6,7 +6,7 @@ UINT64 TranslateLinearAddress(UINT64 directoryTableBase, UINT64 virtualAddress);
 
 DWORD GetUserDirectoryTableBaseOffset()
 {
-	RTL_OSVERSIONINFOW ver = { 0 };
+	RTL_OSVERSIONINFOW ver{};
 	C_FN(RtlGetVersion)(&ver);
 
 	switch (ver.dwBuildNumber)

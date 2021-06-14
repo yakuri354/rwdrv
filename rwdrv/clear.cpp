@@ -5,11 +5,11 @@
 
 using namespace Search;
 
-NTSTATUS Clear::CleanupMiscTraces(DriverState *driverState)
+NTSTATUS Clear::CleanupMiscTraces(DriverState* driverState)
 {
 	NTSTATUS status;
 	// Probably detected
-	// status = Clear::SpoofDiskSerials(Search::KernelBase, &driverState->OriginalDiskDispatchFn);
+	// status = Clear::SpoofDiskSerials(Search::Kernel.Base, &driverState->OriginalDiskDispatchFn);
 	// if (!NT_SUCCESS(status))
 	// {
 	// 	log(skCrypt("[rwdrv] Spoofing disk serials failed");
@@ -28,6 +28,12 @@ NTSTATUS Clear::CleanupMiscTraces(DriverState *driverState)
 	if (!NT_SUCCESS(status))
 	{
 		log("Clearing Pfn table entry failed");
+		return status;
+	}
+	status = ClearCiEaCache();
+	if (!NT_SUCCESS(status))
+	{
+		log("Clearing CiEaCacheLookasideList failed");
 		return status;
 	}
 	driverState->TracesCleaned = true;
@@ -120,8 +126,36 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 	}
 
 	C_FN(IoFreeMdl)(mdl);
-	
+
 	log("Successfully cleared Pfns");
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS Clear::ClearCiEaCache()
+{
+	RTL_OSVERSIONINFOW ver{};
+	C_FN(RtlGetVersion)(&ver);
+
+	auto instr = FindPattern(
+		UINT64(g::Kernel.Base),
+		g::Kernel.Size,
+		PBYTE(PCHAR(skCrypt(
+			"\x8B\xD8\xFF\x05\x00\x00\x00\x00"))),
+		skCrypt("xxxx????")
+	);
+
+	if (instr == NULL)
+	{
+		log("Could not find CiEaCache");
+		return STATUS_NOT_FOUND;
+	}
+
+	const auto ptr = RVA(instr + 8, 3);
+
+	log("Found CIEaCacheLookasideList at [0x%p], flushing", ptr);
+
+	C_FN(ExFlushLookasideListEx)(PLOOKASIDE_LIST_EX(ptr));
+
 	return STATUS_SUCCESS;
 }
 
@@ -129,8 +163,8 @@ NTSTATUS Clear::ClearPfnEntry(PVOID pageAddress, ULONG pageSize)
 BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES** poolBigPageTable, SIZE_T* poolBigPageTableSize) // FIXME
 {
 	const auto bptSize = FindPattern(
-		reinterpret_cast<UINT64>(KernelBase),
-		KernelSize,
+		reinterpret_cast<UINT64>(g::Kernel.Base),
+		g::Kernel.Size,
 		reinterpret_cast<BYTE*>( // Pattern
 			static_cast<char*>(
 				skCrypt("\x4C\x8B\x15\x00\x00\x00\x00\x48\x85")
@@ -139,8 +173,8 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES** poolBigPageTable, SIZE_T* poo
 	);
 
 	const auto bpt = FindPattern(
-		reinterpret_cast<UINT64>(KernelBase),
-		KernelSize,
+		reinterpret_cast<UINT64>(g::Kernel.Base),
+		g::Kernel.Size,
 		reinterpret_cast<BYTE*>(
 			static_cast<char*>(
 				skCrypt("\x48\x8B\x15\x00\x00\x00\x00\x4C\x8D\x0D\x00\x00\x00\x00\x4C")
@@ -162,8 +196,8 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES** poolBigPageTable, SIZE_T* poo
 bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES** pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
 {
 	const auto exProtectPoolExCallInstructionsAddress = FindPattern(
-		reinterpret_cast<UINT64>(KernelBase),
-		KernelSize,
+		reinterpret_cast<UINT64>(g::Kernel.Base),
+		g::Kernel.Size,
 		reinterpret_cast<BYTE*>(static_cast<char*>((
 				skCrypt("\xE8\x00\x00\x00\x00\x83\x67\x0C\x00"))
 		)),
@@ -210,7 +244,7 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 
 	PPOOL_TRACKER_BIG_PAGES poolBigPageTable{};
 	RtlCopyMemory(&poolBigPageTable, PVOID(pPoolBigPageTable), 8);
-	
+
 	log("Found BigPoolPageTable at [0x%p] of size %llu; scanning", poolBigPageTable, bigPoolTableSize);
 
 	auto cleared = false;
@@ -219,20 +253,21 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 	{
 		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
 		{
-			char tag[5] = { 0 };
+			char tag[5] = {0};
 			RtlCopyMemory(tag, &poolBigPageTable[i].Key, 4);
 			log("Found an entry in BigPoolTable: [0x%p] | Size: 0x%llX | Tag: '%s'",
-				PVOID(poolBigPageTable[i].Va),
-				poolBigPageTable[i].NumberOfBytes, tag);
+			    PVOID(poolBigPageTable[i].Va),
+			    poolBigPageTable[i].NumberOfBytes, tag);
 			poolBigPageTable[i].Va = 0x1;
 			poolBigPageTable[i].NumberOfBytes = 0x0;
 			cleared = true;
 			//return STATUS_SUCCESS;
 		}
 	}
-	if (!cleared) {
+	if (!cleared)
+	{
 		log("Entry in BigPoolTable not found!");
 		return STATUS_NOT_FOUND;
-	} 
+	}
 	return STATUS_SUCCESS;
 }

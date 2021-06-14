@@ -10,9 +10,18 @@
 
 constexpr ULONG BB_POOL_TAG = 'erhT';
 
+struct Module
+{
+	PVOID Base;
+	ULONG Size;
+};
+
 namespace g
 {
-	extern PVOID KernelBase;
+	extern Module Kernel;
+	extern Module Win32k;
+	extern Module Realtek;
+	extern Module CIdll;
 }
 
 __forceinline bool NT_SUCCESS(NTSTATUS status)
@@ -65,6 +74,14 @@ struct DriverState
 
 #endif
 
+//https://ntdiff.github.io/
+#define WINDOWS_1803 17134
+#define WINDOWS_1809 17763
+#define WINDOWS_1903 18362
+#define WINDOWS_1909 18363
+#define WINDOWS_2004 19041
+#define WINDOWS_20H2 19569
+#define WINDOWS_21H1 20180
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION
 {

@@ -52,24 +52,24 @@ __forceinline
 #endif
 Fn* LazyFn()
 {
-	auto* const peHeader = PIMAGE_DOS_HEADER(g::KernelBase);
+	auto* const peHeader = PIMAGE_DOS_HEADER(g::Kernel.Base);
 
-	auto* const ntHeader = PIMAGE_NT_HEADERS(UINT64(g::KernelBase) + peHeader->e_lfanew);
+	auto* const ntHeader = PIMAGE_NT_HEADERS(UINT64(g::Kernel.Base) + peHeader->e_lfanew);
 
 	auto* const imageExportDirectory = PIMAGE_EXPORT_DIRECTORY(
-		UINT64(g::KernelBase) + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+		UINT64(g::Kernel.Base) + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
 
-	auto* const address = PDWORD(UINT64(g::KernelBase) + imageExportDirectory->AddressOfFunctions);
-	auto* const addressOfNames = PDWORD(UINT64(g::KernelBase) + imageExportDirectory->AddressOfNames);
+	auto* const address = PDWORD(UINT64(g::Kernel.Base) + imageExportDirectory->AddressOfFunctions);
+	auto* const addressOfNames = PDWORD(UINT64(g::Kernel.Base) + imageExportDirectory->AddressOfNames);
 
-	auto* const ordinal = PWORD(UINT64(g::KernelBase) + imageExportDirectory->AddressOfNameOrdinals);
+	auto* const ordinal = PWORD(UINT64(g::Kernel.Base) + imageExportDirectory->AddressOfNameOrdinals);
 	
 	for (unsigned i = 0; imageExportDirectory->AddressOfNames + (i * 4) < imageExportDirectory->AddressOfNameOrdinals; i++)
 	{
-		auto const key = PCHAR(g::KernelBase) + addressOfNames[i];
+		auto const key = PCHAR(g::Kernel.Base) + addressOfNames[i];
 		if (StrHash(key) == Hash)
 		{
-			return reinterpret_cast<Fn*>(UINT64(g::KernelBase) + address[ordinal[i]]);
+			return reinterpret_cast<Fn*>(UINT64(g::Kernel.Base) + address[ordinal[i]]);
 		}
 	}
 	return nullptr;

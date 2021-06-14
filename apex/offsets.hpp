@@ -44,7 +44,7 @@ namespace apex
 
 		namespace etc
 		{
-			constexpr uintptr_t name_list = 0x81AF4C0;
+			constexpr uintptr_t name_list = 0x81AF640;
 			constexpr uintptr_t view_render = 0x40BF2E8;
 			constexpr uintptr_t view_matrix = 0x1B3BD0;
 		}
