@@ -10,18 +10,12 @@
 
 constexpr ULONG BB_POOL_TAG = 'erhT';
 
-struct Module
-{
-	PVOID Base;
-	ULONG Size;
-};
-
 namespace g
 {
-	extern Module Kernel;
-	extern Module Win32k;
-	extern Module Realtek;
-	extern Module CIdll;
+	extern void* Kernel;
+	extern void* Win32k;
+	extern void* Realtek;
+	extern void* CIdll;
 }
 
 __forceinline bool NT_SUCCESS(NTSTATUS status)

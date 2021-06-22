@@ -9,10 +9,10 @@
 
 static_assert(_M_X64, "Only x86_64 is supported");;
 
-Module g::Kernel{};
-Module g::Win32k{};
-Module g::Realtek{};
-Module g::CIdll{};
+void* g::Kernel = nullptr;
+void* g::Win32k = nullptr;
+void* g::Realtek = nullptr;
+void* g::CIdll = nullptr;
 
 namespace g
 {
@@ -41,9 +41,8 @@ F_INLINE NTSTATUS SetupHook()
 {
 	// The outside function, first in the chain
 	// __int64 __fastcall ApiSetEditionOpenInputDesktopEntryPoint(unsigned int a1, unsigned int a2, unsigned int a3)
-	const auto syscall = Search::FindPattern(
-		UINT64(g::Win32k.Base),
-		g::Win32k.Size,
+	const auto syscall = Search::FindPatternInSection(
+		g::Win32k, skCrypt(".text"),
 		PUCHAR(PCHAR(skCrypt("\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x10\x44\x8B\xC7\x8B\xD6\x8B\xCD"))),
 		PCHAR(skCrypt("xxx????xxxxxxxxxxxx"))
 	);
@@ -58,9 +57,8 @@ F_INLINE NTSTATUS SetupHook()
 
 	log("Syscall pointer location at [0x%p]", PVOID(syscallDataPtr));
 
-	const auto rtLogFn = Search::FindPattern(
-		UINT64(g::Realtek.Base),
-		g::Realtek.Size,
+	const auto rtLogFn = Search::FindPatternInSection(
+		g::Realtek, skCrypt(".text"),
 		PUCHAR(PCHAR(skCrypt("\xE8\x00\x00\x00\x00\x4C\x8D\x5C\x24\x70\x8B\xC3"))),
 		PCHAR(skCrypt("x????xxxxxxx"))
 	);
@@ -159,7 +157,7 @@ NTSTATUS DriverEntry(PVOID baseAddress, ULONG imageSize, ULONG tag, PVOID kernel
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	g::Kernel.Base = kernelBase;
+	g::Kernel = kernelBase;
 
 #ifdef DEBUG
 	logRaw("\n\n\n--------------------------------------------------------\n\n");

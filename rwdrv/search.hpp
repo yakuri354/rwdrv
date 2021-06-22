@@ -16,4 +16,5 @@ namespace Search
 
 	inline BOOLEAN bDataCompare(const BYTE* pData, const BYTE* bMask, const char* szMask);
 	UINT64 FindPattern(UINT64 dwAddress, UINT64 dwLen, BYTE* bMask, char* szMask);
+	UINT64 FindPatternInSection(PVOID base, PCCHAR section, PUCHAR bMask, PCHAR szMask);
 }

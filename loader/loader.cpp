@@ -266,9 +266,11 @@ bool load_driver() // TODO Refactor kdmapper
 		return false;
 	}
 
-	if (!intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle))
+	if (!intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle)
+		|| !intel_driver::ClearMmUnloadedDrivers(iqvw64e_device_handle)
+		|| !intel_driver::ClearKernelHashBucketList(iqvw64e_device_handle))
 	{
-		std::cout << xs("[-] Failed to ClearPiDDBCacheTable") << std::endl;
+		std::cout << xs("[-] Cleaning up failed") << std::endl;
 		intel_driver::Unload(iqvw64e_device_handle);
 		return false;
 	}
@@ -279,6 +281,7 @@ bool load_driver() // TODO Refactor kdmapper
 		intel_driver::Unload(iqvw64e_device_handle);
 		return false;
 	}
+	
 
 	intel_driver::Unload(iqvw64e_device_handle);
 	std::cout << xs("[>] Successfully loaded driver") << std::endl;

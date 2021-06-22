@@ -1,4 +1,7 @@
 ﻿#include "pch.h"
+
+#define TEST_RUN
+
 #include <random>
 #include "../rwdrv/comms.hpp"
 #include <iostream>

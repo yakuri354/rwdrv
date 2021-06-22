@@ -9,9 +9,9 @@ F_INLINE NTSTATUS Search::FindModules()
 	ULONG bytes = 0;
 
 	auto status = C_FN(ZwQuerySystemInformation)(SystemModuleInformation, nullptr, bytes, &bytes);
-	if (!NT_SUCCESS(status))
+	if (status != STATUS_INFO_LENGTH_MISMATCH)
 	{
-		log("ZwQuerySystemInformation failed with code 0x%x", status);
+		log("ZwQuerySystemInformation failed with code 0x%X", status);
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -31,7 +31,7 @@ F_INLINE NTSTATUS Search::FindModules()
 	if (!NT_SUCCESS(status))
 	{
 		C_FN(ExFreePoolWithTag)(pMods, BB_POOL_TAG);
-		log("ZwQuerySystemInformation failed with code 0x%x", status);
+		log("ZwQuerySystemInformation failed with code 0x%X", status);
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -39,31 +39,26 @@ F_INLINE NTSTATUS Search::FindModules()
 
 	bool win32k{}, realtek{}, cidll{}; // TODO Refactor
 
-	constexpr auto wkHash = StrHash(R"(\SystemRoot\System32\win32kbase.sys)");
-	constexpr auto rtHash = StrHash(R"(\SystemRoot\System32\drivers\rt640x64.sys)");
-	constexpr auto ciHash = StrHash(R"(\SystemRoot\System32\ci.dll)");
+	constexpr auto wkHash = StrHash("win32kbase.sys");
+	constexpr auto rtHash = StrHash("rt640x64.sys");
+	constexpr auto ciHash = StrHash("CI.dll");
 
 	auto* const pMod = pMods->Modules;
 
-	g::Kernel.Size = pMod->ImageSize;
-
 	for (ULONG i = 1; i < pMods->NumberOfModules; i++)
 	{
-		switch (StrHash(PCHAR(pMod[i].FullPathName)))
+		switch (StrHash(strrchr(PCHAR(pMod[i].FullPathName), '\\') + 1))
 		{
 		case wkHash:
-			g::Win32k.Base = pMod[i].ImageBase;
-			g::Win32k.Size = pMod[i].ImageSize;
+			g::Win32k = pMod[i].ImageBase;
 			win32k = true;
 			break;
 		case rtHash:
-			g::Realtek.Base = pMod[i].ImageBase;
-			g::Realtek.Size = pMod[i].ImageSize;
+			g::Realtek = pMod[i].ImageBase;
 			realtek = true;
 			break;
 		case ciHash:
-			g::CIdll.Base = pMod[i].ImageBase;
-			g::CIdll.Size = pMod[i].ImageSize;
+			g::CIdll = pMod[i].ImageBase;
 			cidll = true;
 			break;
 		default:;
@@ -79,11 +74,10 @@ F_INLINE NTSTATUS Search::FindModules()
 		return STATUS_NOT_FOUND;
 	}
 
-	log("Kernel  Base: [0x%p]", g::Kernel.Base);
-	log("Win32k  Base: [0x%p]", g::Win32k.Base);
-	log("Ci.dll  Base: [0x%p]", g::CIdll.Base);
-	log("Realtek Base: [0x%p]", g::Realtek.Base);
-	log("Realtek Size: [0x%x]", g::Realtek.Size);
+	log("Ntoskrnl at [0x%p]", g::Kernel);
+	log("Win32k at [0x%p]", g::Win32k);
+	log("CI.dll at [0x%p]", g::CIdll);
+	log("rt640x64 at [0x%p]", g::Realtek);
 	return STATUS_SUCCESS;
 }
 
@@ -120,4 +114,25 @@ F_INLINE UINT64 Search::FindPattern(UINT64 dwAddress, UINT64 dwLen, BYTE* bMask,
 			return UINT64(dwAddress + i);
 
 	return 0;
+}
+
+F_INLINE UINT64 Search::FindPatternInSection(PVOID base, PCCHAR section, PUCHAR bMask, PCHAR szMask)
+{
+	ASSERT(ppFound != NULL);
+
+	if (!base) return NULL;
+
+	const auto pHdr = RtlImageNtHeader(base);
+	if (!pHdr) return NULL;
+
+	const auto pFirstSection = PIMAGE_SECTION_HEADER(pHdr + 1);
+	for (PIMAGE_SECTION_HEADER pSection = pFirstSection; pSection < pFirstSection + pHdr->FileHeader.NumberOfSections; pSection++)
+	{
+		if (strcmp(PCHAR(pSection->Name), section) == 0)
+		{
+			return FindPattern(UINT64(base) + pSection->VirtualAddress, pSection->Misc.VirtualSize, bMask, szMask);
+		}
+	}
+
+	return NULL;
 }

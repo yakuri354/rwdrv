@@ -15,27 +15,30 @@ NTSTATUS Clear::CleanupMiscTraces(DriverState* driverState)
 	// 	log(skCrypt("[rwdrv] Spoofing disk serials failed");
 	// 	return status;
 	// }
-	if (driverState->ImageSize >= 0x1000)
+
+	if (driverState->ImageSize >= 0x1000 && !NT_SUCCESS(
+		status = ClearSystemBigPoolInfo(driverState->BaseAddress)
+	))
 	{
-		status = ClearSystemBigPoolInfo(driverState->BaseAddress);
-		if (!NT_SUCCESS(status))
-		{
-			log("Clearing BigPoolInfo failed");
-			return status;
-		}
+		log("Clearing BigPoolInfo failed");
+		return status;
 	}
-	status = ClearPfnEntry(driverState->BaseAddress, driverState->ImageSize);
-	if (!NT_SUCCESS(status))
+	
+	if (!NT_SUCCESS(
+		status = ClearPfnEntry(driverState->BaseAddress, driverState->ImageSize)
+	))
 	{
 		log("Clearing Pfn table entry failed");
 		return status;
 	}
-	status = ClearCiEaCache();
-	if (!NT_SUCCESS(status))
+	if (!NT_SUCCESS(
+		status = ClearCiEaCache()
+	))
 	{
 		log("Clearing CiEaCacheLookasideList failed");
 		return status;
 	}
+	log("Traces successfully cleared");
 	driverState->TracesCleaned = true;
 	return STATUS_SUCCESS;
 }
@@ -136,12 +139,11 @@ NTSTATUS Clear::ClearCiEaCache()
 	RTL_OSVERSIONINFOW ver{};
 	C_FN(RtlGetVersion)(&ver);
 
-	auto instr = FindPattern(
-		UINT64(g::Kernel.Base),
-		g::Kernel.Size,
-		PBYTE(PCHAR(skCrypt(
-			"\x8B\xD8\xFF\x05\x00\x00\x00\x00"))),
-		skCrypt("xxxx????")
+	const auto instr = FindPatternInSection(
+		g::CIdll, skCrypt("PAGE"),
+		PBYTE(PCHAR(
+			skCrypt("\x8B\xD8\xFF\x05\x00\x00\x00\x00")
+		)), skCrypt("xxxx????")
 	);
 
 	if (instr == NULL)
@@ -162,24 +164,18 @@ NTSTATUS Clear::ClearCiEaCache()
 
 BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES** poolBigPageTable, SIZE_T* poolBigPageTableSize) // FIXME
 {
-	const auto bptSize = FindPattern(
-		reinterpret_cast<UINT64>(g::Kernel.Base),
-		g::Kernel.Size,
-		reinterpret_cast<BYTE*>( // Pattern
-			static_cast<char*>(
-				skCrypt("\x4C\x8B\x15\x00\x00\x00\x00\x48\x85")
-			)),
-		skCrypt("xxx????xx")
+	const auto bptSize = FindPatternInSection(
+		g::Kernel, skCrypt(".text"),
+		PBYTE(PCHAR(
+			skCrypt("\x4C\x8B\x15\x00\x00\x00\x00\x48\x85")
+		)), skCrypt("xxx????xx")
 	);
 
-	const auto bpt = FindPattern(
-		reinterpret_cast<UINT64>(g::Kernel.Base),
-		g::Kernel.Size,
-		reinterpret_cast<BYTE*>(
-			static_cast<char*>(
-				skCrypt("\x48\x8B\x15\x00\x00\x00\x00\x4C\x8D\x0D\x00\x00\x00\x00\x4C")
-			)),
-		skCrypt("xxx????xxx????x")
+	const auto bpt = FindPatternInSection(
+		g::Kernel, skCrypt(".text"),
+		PBYTE(PCHAR(
+			skCrypt("\x48\x8B\x15\x00\x00\x00\x00\x4C\x8D\x0D\x00\x00\x00\x00\x4C")
+		)), skCrypt("xxx????xxx????x")
 	);
 
 	if (!bptSize || !bpt)
@@ -188,20 +184,18 @@ BOOLEAN FindBigPoolTable(PPOOL_TRACKER_BIG_PAGES** poolBigPageTable, SIZE_T* poo
 	}
 
 	*poolBigPageTable = static_cast<PPOOL_TRACKER_BIG_PAGES*>(RVA(bpt, 3));
-	*poolBigPageTableSize = *static_cast<PSIZE_T>(RVA(bptSize, 3));
+	*poolBigPageTableSize = *PSIZE_T(RVA(bptSize, 3));
 	return true;
 }
 
 
 bool FindBigPoolTableAlt(PPOOL_TRACKER_BIG_PAGES** pPoolBigPageTable, SIZE_T* pPoolBigPageTableSize)
 {
-	const auto exProtectPoolExCallInstructionsAddress = FindPattern(
-		reinterpret_cast<UINT64>(g::Kernel.Base),
-		g::Kernel.Size,
-		reinterpret_cast<BYTE*>(static_cast<char*>((
-				skCrypt("\xE8\x00\x00\x00\x00\x83\x67\x0C\x00"))
-		)),
-		skCrypt("x????xxxx")
+	const auto exProtectPoolExCallInstructionsAddress = FindPatternInSection(
+		g::Kernel, skCrypt(".text"),
+		PBYTE(PCHAR(
+			skCrypt("\xE8\x00\x00\x00\x00\x83\x67\x0C\x00")
+		)), skCrypt("x????xxxx")
 	);
 
 	if (!exProtectPoolExCallInstructionsAddress)
