@@ -1,13 +1,10 @@
 ﻿#include "pch.h"
-
-#define TEST_RUN
-
 #include <random>
 #include "../rwdrv/comms.hpp"
 #include <iostream>
 #include "common.hpp"
 #include "hoster.hpp"
-#include "provider.hpp"
+#include "memory.hpp"
 #ifdef TEST_RUN
 #include "test.h"
 #else
@@ -66,8 +63,8 @@ bool cleanup()
 
 	return true;
 }
-
-DWORD WINAPI real_main(void* param)
+extern "C" __declspec(dllexport)
+DWORD WINAPI StartHost(void* param)
 {
 	log("Starting initialization");
 
@@ -142,7 +139,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	if (ul_reason_for_call == DLL_PROCESS_ATTACH)
 	{
 		log("Launching thread");
-		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(real_main), nullptr, NULL, &g::state.main_thread);
+		LI_FN(CreateThread)(nullptr, NULL, LPTHREAD_START_ROUTINE(StartHost), nullptr, NULL, &g::state.main_thread);
 	}
 
 	return TRUE;

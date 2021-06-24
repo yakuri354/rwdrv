@@ -1,8 +1,7 @@
 #include "exec.hpp"
 
 NTSTATUS UnloadDriver(DriverState* state);
-NTSTATUS ReadVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead);
-NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead);
+NTSTATUS CopyVirtualMemory(bool writeToPid, HANDLE pid, PVOID source, PVOID target, SIZE_T size, PSIZE_T bytesRead);
 
 NTSTATUS ExecuteRequest(Control* ctl, DriverState* driverState)
 {
@@ -36,14 +35,14 @@ NTSTATUS ExecuteRequest(Control* ctl, DriverState* driverState)
 #if USE_PHYSMEM
 		return Phys::ReadProcessMemory(HANDLE(ctl->Pid), ctl->Source, ctl->Target, ctl->Size, &ctl->Result);
 #else
-		return ReadVirtualMemory(HANDLE(ctl->Pid), ctl->Source, ctl->Target, ctl->Size, &ctl->Result);
+		return CopyVirtualMemory(false, HANDLE(ctl->Pid), ctl->Source, ctl->Target, ctl->Size, &ctl->Result);
 #endif
 
 	case Ctl::VIRT_WRITE:
 #if USE_PHYSMEM
 		return Phys::WriteProcessMemory(HANDLE(ctl->Pid), ctl->Target, ctl->Source, ctl->Size, &ctl->Result);
 #else
-		return WriteVirtualMemory(HANDLE(ctl->Pid), ctl->Target, ctl->Source, ctl->Size, &ctl->Result);
+		return CopyVirtualMemory(true, HANDLE(ctl->Pid), ctl->Source, ctl->Target, ctl->Size, &ctl->Result);
 #endif
 	default:
 		log("Invalid ctlCode: 0x%x", ctl->CtlCode);
@@ -52,58 +51,33 @@ NTSTATUS ExecuteRequest(Control* ctl, DriverState* driverState)
 }
 
 
-F_INLINE NTSTATUS ReadVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead)
+F_INLINE NTSTATUS CopyVirtualMemory(bool writeToPid, HANDLE pid, PVOID source, PVOID target, SIZE_T size, PSIZE_T bytesRead)
 {
-	PEPROCESS proc;
-
+	PEPROCESS proc{};
+	NTSTATUS status = STATUS_FWP_NULL_POINTER;
+	SIZE_T bytesReadKm{};
 	if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(pid, &proc)))
 	{
 		log("Process %llu not found", UINT64(pid));
 		return STATUS_NOT_FOUND;
 	}
 
-	const auto status = C_FN(MmCopyVirtualMemory)(
-		proc,
-		va,
-		C_FN(IoGetCurrentProcess)(),
-		buffer,
-		size,
-		UserMode,
-		bytesRead
-	);
+	if (target == nullptr || source == nullptr || !NT_SUCCESS(
+		status = C_FN(MmCopyVirtualMemory)(
+			writeToPid ? C_FN(IoGetCurrentProcess)() : proc,
+			source,
+			writeToPid ? proc : C_FN(IoGetCurrentProcess)(),
+			target,
+			size,
+			UserMode,
+			&bytesReadKm
+		)))
+		log("Memcpy from [0x%p] to [0x%p] failed with status 0x%x", source, target, status);
 
 	C_FN(ObfDereferenceObject)(proc);
 
-	if (!NT_SUCCESS(status))
-		log("Va read at [0x%p] failed with status 0x%x", va, status);
-
-	return status;
-}
-
-F_INLINE NTSTATUS WriteVirtualMemory(HANDLE pid, PVOID va, PVOID buffer, SIZE_T size, PSIZE_T bytesRead)
-{
-	PEPROCESS proc;
-	if (!NT_SUCCESS(C_FN(PsLookupProcessByProcessId)(pid, &proc)))
-	{
-		log("Process %llu not found", UINT64(pid));
-		return STATUS_NOT_FOUND;
-	}
-
-	const auto status = C_FN(MmCopyVirtualMemory)(
-		proc,
-		va,
-		C_FN(IoGetCurrentProcess)(),
-		buffer,
-		size,
-		UserMode,
-		bytesRead
-	);
-
-	C_FN(ObfDereferenceObject)(proc);
-
-	if (!NT_SUCCESS(status))
-		log("Va write at [0x%p] failed with status 0x%x", va, status);
-
+	*bytesRead = bytesReadKm;
+	
 	return status;
 }
 

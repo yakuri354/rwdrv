@@ -1,7 +1,9 @@
 #pragma once
 
+#define _DEBUG
+
 #ifdef _DEBUG
-#define dbgLog ___log
+#define dbgLog log_
 #define marker() LI_FN(OutputDebugStringA)("[umc] " __FUNCTION__ "\n")
 #else
 #define dbgLog(...)

@@ -11,13 +11,24 @@ void cheat(const hoster& host)
 		{
 			const apex::game game{host.mem};
 
-			auto local_player = std::make_unique<apex::entity>(game.local_player(), host.mem);
+			auto lptr = game.local_player();
+
+			while (lptr == NULL)
+			{
+				host.logH("Local player is null, waiting for lobby");
+				Sleep(1000);
+				lptr = game.local_player();
+			}
+			
+			auto local_player = std::make_unique<apex::entity>(lptr, host.mem);
 			host.logH("Local player at [0x%llx]", local_player->ptr);
 
 			while (true)
 			{
 				game.process_entities(*local_player);
+#ifdef _DEBUG
 				Sleep(1000);
+#endif
 			}
 		}
 		catch (ex::process_not_found&)

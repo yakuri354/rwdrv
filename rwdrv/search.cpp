@@ -1,10 +1,20 @@
 #include "search.hpp"
 #include "skcrypt.hpp"
 
-#undef F_INLINE
-#define F_INLINE
+char* strrchr_(const char* cp, const int ch)
+{
+	char* save;
+	char c;
 
-F_INLINE NTSTATUS Search::FindModules()
+	for (save = nullptr; (c = *cp) != 0; cp++) {
+		if (c == ch)
+			save = PCHAR(cp);
+	}
+
+	return save;
+}
+
+NTSTATUS Search::FindModules()
 {
 	ULONG bytes = 0;
 
@@ -47,7 +57,7 @@ F_INLINE NTSTATUS Search::FindModules()
 
 	for (ULONG i = 1; i < pMods->NumberOfModules; i++)
 	{
-		switch (StrHash(strrchr(PCHAR(pMod[i].FullPathName), '\\') + 1))
+		switch (StrHash(strrchr_(PCHAR(pMod[i].FullPathName), '\\') + 1))
 		{
 		case wkHash:
 			g::Win32k = pMod[i].ImageBase;
@@ -65,7 +75,6 @@ F_INLINE NTSTATUS Search::FindModules()
 		}
 	}
 
-
 	C_FN(ExFreePoolWithTag)(pMods, BB_POOL_TAG);
 
 	if (!win32k || !realtek | !cidll)
@@ -81,7 +90,7 @@ F_INLINE NTSTATUS Search::FindModules()
 	return STATUS_SUCCESS;
 }
 
-F_INLINE PVOID Search::RVA(
+PVOID Search::RVA(
 	_In_ UINT64 instruction,
 	_In_ const ULONG offset
 )
@@ -91,7 +100,7 @@ F_INLINE PVOID Search::RVA(
 	return PVOID(instruction + offset + sizeof(LONG) + ripOffset);
 }
 
-F_INLINE PVOID Search::ResolveEnclosingSig(UINT64 callAddress, UINT movOffset)
+PVOID Search::ResolveEnclosingSig(UINT64 callAddress, UINT movOffset)
 {
 	const auto targetFn = UINT64(RVA(callAddress, 1));
 	return RVA(targetFn + movOffset, 3);
@@ -107,7 +116,7 @@ F_INLINE BOOLEAN Search::bDataCompare(const BYTE* pData, const BYTE* bMask, cons
 	return (*szMask) == 0;
 }
 
-F_INLINE UINT64 Search::FindPattern(UINT64 dwAddress, UINT64 dwLen, BYTE* bMask, char* szMask)
+UINT64 Search::FindPattern(UINT64 dwAddress, UINT64 dwLen, BYTE* bMask, char* szMask)
 {
 	for (UINT64 i = 0; i < dwLen; i++)
 		if (bDataCompare(reinterpret_cast<BYTE*>(dwAddress + i), bMask, szMask))
@@ -116,13 +125,14 @@ F_INLINE UINT64 Search::FindPattern(UINT64 dwAddress, UINT64 dwLen, BYTE* bMask,
 	return 0;
 }
 
-F_INLINE UINT64 Search::FindPatternInSection(PVOID base, PCCHAR section, PUCHAR bMask, PCHAR szMask)
+UINT64 Search::FindPatternInSection(PVOID base, PCCHAR section, PUCHAR bMask, PCHAR szMask)
 {
 	ASSERT(ppFound != NULL);
 
 	if (!base) return NULL;
 
-	const auto pHdr = RtlImageNtHeader(base);
+	const auto pHdr = PIMAGE_NT_HEADERS(UINT_PTR(base) + PIMAGE_DOS_HEADER(base)->e_lfanew);
+	
 	if (!pHdr) return NULL;
 
 	const auto pFirstSection = PIMAGE_SECTION_HEADER(pHdr + 1);

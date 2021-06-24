@@ -33,18 +33,18 @@ namespace apex {
 	
 	struct game
 	{
-		explicit game(provider& mem);
+		explicit game(memory& mem);
 		
 		uintptr_t entity_list() const;
 		uintptr_t local_player() const;
-		uintptr_t get_entity_by_id(uint32_t id) const;
+		uintptr_t get_entity_ptr_by_id(uint32_t id) const;
 		void process_entities(const entity& local_player) const;
-		void highlight_entity(uintptr_t entity, color col, glow_mode mode) const;
+		void highlight_entity(entity& entity, color col, glow_mode mode) const;
 
 		uintptr_t base;
 	
 	private:
 		
-		provider& mem;
+		memory& mem;
 	};
 }

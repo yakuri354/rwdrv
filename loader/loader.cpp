@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <locale>
 #include <codecvt>
+#include <random>
 #include <string>
 #include "../kdmapper/kdmapper.hpp"
 #include "xorstr.hpp"
@@ -40,21 +41,22 @@ DWORD GetProcessByNameW(std::wstring name)
 }
 
 
-std::string GenRandStr(const int len)
+std::string GenRandStr(std::default_random_engine& engine, int low, int high)
 {
 	std::string tmp_s;
-	static const auto alphanum = xs(
-		"0123456789" // +
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZ" // +
-		"abcdefghijklmnopqrstuvwxyz"
+	const char* alphanum = xs(
+		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	);
 
-	srand(static_cast<unsigned>(time(nullptr)) * GetCurrentProcessId());
+	const std::uniform_int_distribution<> len_d(low, high);
+	const auto len = len_d(engine);
 
 	tmp_s.reserve(len);
 
+	const std::uniform_int_distribution<> idx_d(0, 62);
+
 	for (auto i = 0; i < len; ++i)
-		tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
+		tmp_s += alphanum[idx_d(engine)];
 
 	return tmp_s;
 }
@@ -190,11 +192,13 @@ bool InjectDll(std::wstring* process)
 
 	const auto temp = std::filesystem::temp_directory_path();
 
-	const auto dll_name = GenRandStr(10) + xs(".dll");
+	std::default_random_engine rng(std::random_device{}());
+
+	const auto dll_name = GenRandStr(rng, 20, 30) + xs(".dll");
 
 	const auto real_dll_path = temp / dll_name;
 
-	copy(std::filesystem::path(ExePath()) / xs("host.dll"), real_dll_path);
+	std::filesystem::copy(std::filesystem::path(ExePath()) / xs("host.dll"), real_dll_path);
 
 
 	auto* const memory = VirtualAllocEx(hProc, nullptr,
@@ -253,7 +257,7 @@ bool InjectDll(std::wstring* process)
 	return true;
 }
 
-bool load_driver() // TODO Refactor kdmapper
+bool load_driver()
 {
 	std::cout << xs("[>] Loading driver") << std::endl;
 
@@ -281,7 +285,7 @@ bool load_driver() // TODO Refactor kdmapper
 		intel_driver::Unload(iqvw64e_device_handle);
 		return false;
 	}
-	
+
 
 	intel_driver::Unload(iqvw64e_device_handle);
 	std::cout << xs("[>] Successfully loaded driver") << std::endl;
@@ -294,7 +298,7 @@ bool check_serivice()
 	DWORD servicesCount{};
 	DWORD resumeHandle{};
 
-	std::cout << xs("[>] Checking for AC services") << std::endl;
+	std::cout << xs("[>] Checking for AC services") << std::endl; 
 
 	const auto sc_handle = OpenSCManagerA(nullptr,
 	                                      nullptr, SC_MANAGER_ENUMERATE_SERVICE);
@@ -414,17 +418,17 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 
 	if (!check_serivice())
 	{
-		std::cout << xs("[-] Battleye check failed") << std::endl;
+		std::cout << xs("[-] AC check failed") << std::endl;
 		return 1;
 	}
 
-	std::cout << xs("[+] BE service not found") << std::endl;
+	std::cout << xs("[+] AC service not found") << std::endl;
 
 	if (!forceReloadDrv && check_driver())
 	{
 		std::cout << xs("[+] Driver already loaded, injecting dll") << std::endl;
 	}
-	else if (!load_driver()) // TODO Change mapper
+	else if (!load_driver()) // TODO Custom mapper
 	{
 		std::cout << xs("[-] Failed to load driver") << std::endl;
 		return 1;

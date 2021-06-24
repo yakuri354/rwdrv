@@ -1,33 +1,26 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Document Version="2">
-    <Protection InputFileName="rwdrv.sys" Options="852168">
-        <Messages>
-            <Message Id="0" />
-            <Message Id="1" />
-            <Message Id="2" />
-            <Message Id="3" />
-        </Messages>
+    <Protection InputFileName="rwdrv.sys" Options="857032">
+        <Messages />
         <Folders />
         <Procedures>
-            <Procedure MapAddress="Clear::ClearPfnEntry(void *,unsigned long)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="Clear::ClearSystemBigPoolInfo(void *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="Clear::CleanupMiscTraces(struct DriverState *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="DriverEntry(void *,unsigned long,unsigned long,void *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="ExecuteRequest(struct Control *,struct DriverState *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="FindBigPoolTableAlt(struct _POOL_TRACKER_BIG_PAGES ** *,unsigned __int64 *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="HookControl(unsigned __int64,unsigned __int64,unsigned __int64,unsigned short,unsigned __int64)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="GetProcessCr3(struct _KPROCESS *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="FindBigPoolTable(struct _POOL_TRACKER_BIG_PAGES ** *,unsigned __int64 *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="TranslateLinearAddress(unsigned __int64,unsigned __int64)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="GetUserDirectoryTableBaseOffset(void)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="Phys::ReadPhysicalAddress(void *,void *,unsigned __int64,unsigned __int64 *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="Phys::WritePhysicalAddress(void *,void *,unsigned __int64,unsigned __int64 *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="Phys::WriteProcessMemory(void *,void *,void *,unsigned __int64,unsigned __int64 *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="Phys::ReadProcessMemory(void *,void *,void *,unsigned __int64,unsigned __int64 *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="Search::SetKernelProps(void *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="Search::ResolveEnclosingSig(unsigned __int64,unsigned int)" Options="0" CompilationType="2" />
             <Procedure MapAddress="Search::RVA(unsigned __int64,unsigned long)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="Search::ResolveEnclosingSig(unsigned __int64,unsigned int)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="Search::FindModules(void)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="Search::FindPatternInSection(void *,char *,unsigned char *,char *)" Options="0" CompilationType="1" />
             <Procedure MapAddress="Search::FindPattern(unsigned __int64,unsigned __int64,unsigned char *,char *)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="DriverEntry(void *,unsigned long,unsigned long,void *)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="memmove" Options="0" CompilationType="1" />
+            <Procedure MapAddress="strrchr" Options="0" CompilationType="1" />
+            <Procedure MapAddress="memset" Options="0" CompilationType="1" />
+            <Procedure MapAddress="FindBigPoolTable(struct _POOL_TRACKER_BIG_PAGES ** *,unsigned __int64 *)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="FindBigPoolTableAlt(struct _POOL_TRACKER_BIG_PAGES ** *,unsigned __int64 *)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="ExecuteRequest(struct Control *,struct DriverState *)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="HookControl(unsigned __int64,unsigned __int64,unsigned __int64,unsigned short,unsigned __int64)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="Clear::CleanupMiscTraces(struct DriverState *)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="Clear::ClearCiEaCache(void)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="Clear::ClearSystemBigPoolInfo(void *)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="Clear::ClearPfnEntry(void *,unsigned long)" Options="0" CompilationType="2" />
         </Procedures>
         <Objects />
     </Protection>

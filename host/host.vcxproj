@@ -282,14 +282,14 @@
     <ClInclude Include="hoster.hpp" />
     <ClInclude Include="hostframework.h" />
     <ClInclude Include="lazy_importer.hpp" />
-    <ClInclude Include="provider.hpp" />
+    <ClInclude Include="memory.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="test.h" />
     <ClInclude Include="util.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="provider.cpp" />
+    <ClCompile Include="memory.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

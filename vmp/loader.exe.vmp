@@ -1,47 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Document Version="2">
-    <Protection InputFileName="loader.exe" Options="857032" VMCodeSectionName=".vx">
+    <Protection InputFileName="loader.exe" Options="857032">
         <Messages />
         <Folders />
         <Procedures>
-            <Procedure MapAddress="get_hook_fn(void))(unsigned int,unsigned short,unsigned int)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="load(bool,class std::basic_string&lt;wchar_t,struct std::char_traits&lt;wchar_t&gt;,class std::allocator&lt;wchar_t&gt; &gt; *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="utils::GetKernelModuleAddress(class std::basic_string&lt;char,struct std::char_traits&lt;char&gt;,class std::allocator&lt;char&gt; &gt; const &amp;)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="utils::ReadFileToMemory(class std::basic_string&lt;char,struct std::char_traits&lt;char&gt;,class std::allocator&lt;char&gt; &gt; const &amp;,class std::vector&lt;unsigned char,class std::allocator&lt;unsigned char&gt; &gt; *)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="`GenRandStr&apos;::`1&apos;::dtor$0" Options="0" CompilationType="2" />
+            <Procedure MapAddress="`GetProcessByNameW&apos;::`1&apos;::dtor$0" Options="0" CompilationType="2" />
             <Procedure MapAddress="kdmapper::MapDriver(void *,class std::basic_string&lt;char,struct std::char_traits&lt;char&gt;,class std::allocator&lt;char&gt; &gt; const &amp;)" Options="0" CompilationType="2" />
             <Procedure MapAddress="kdmapper::RelocateImageByDelta(class std::vector&lt;struct portable_executable::RelocInfo,class std::allocator&lt;struct portable_executable::RelocInfo&gt; &gt;,unsigned __int64)" Options="0" CompilationType="1" />
             <Procedure MapAddress="kdmapper::ResolveImports(void *,class std::vector&lt;struct portable_executable::ImportInfo,class std::allocator&lt;struct portable_executable::ImportInfo&gt; &gt;)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="intel_driver::LookupEntry(void *,struct intel_driver::_RTL_AVL_TABLE *,unsigned long)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::AllocatePool(void *,enum nt::_POOL_TYPE,unsigned __int64)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::FindPatternInSectionAtKernel(void *,char *,unsigned __int64,unsigned char *,char *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::Unload(void *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::WriteToReadOnlyMemory(void *,unsigned __int64,void *,unsigned int)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="intel_driver::FindPatternAtKernel(void *,unsigned __int64,unsigned __int64,unsigned char *,char *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="intel_driver::CallKernelFunction&lt;void,void *&gt;(void *,void *,unsigned __int64,void * const)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::CallKernelFunction&lt;unsigned char,void *,void *&gt;(void *,unsigned char *,unsigned __int64,void * const,void * const)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::ExReleaseResourceLite(void *,void *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="intel_driver::CallKernelFunction&lt;long,unsigned __int64,unsigned long,int,unsigned __int64&gt;(void *,long *,unsigned __int64,unsigned __int64,unsigned long,int,unsigned __int64)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::ResolveRelativeAddress(void *,void *,unsigned long,unsigned long)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="intel_driver::ClearPiDDBCacheTable(void *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::CallKernelFunction&lt;unsigned __int64,enum nt::_POOL_TYPE,unsigned __int64,int&gt;(void *,unsigned __int64 *,unsigned __int64,enum nt::_POOL_TYPE,unsigned __int64,int)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::CallKernelFunction&lt;unsigned char,void *,unsigned char&gt;(void *,unsigned char *,unsigned __int64,void * const,unsigned char)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::WriteMemory(void *,unsigned __int64,void *,unsigned __int64)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="intel_driver::CallKernelFunction&lt;void,unsigned __int64&gt;(void *,void *,unsigned __int64,unsigned __int64)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::RtlDeleteElementGenericTableAvl(void *,void *,void *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="intel_driver::Load(void)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::ExAcquireResourceExclusiveLite(void *,void *,unsigned char)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="intel_driver::GetKernelModuleExport(void *,unsigned __int64,class std::basic_string&lt;char,struct std::char_traits&lt;char&gt;,class std::allocator&lt;char&gt; &gt; const &amp;)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="`portable_executable::GetImports&apos;::`1&apos;::dtor$1" IncludedInCompilation="0" Options="0" CompilationType="1" />
-            <Procedure MapAddress="`portable_executable::GetImports&apos;::`1&apos;::dtor$2" IncludedInCompilation="0" Options="0" CompilationType="1" />
-            <Procedure MapAddress="`portable_executable::GetImports&apos;::`1&apos;::dtor$4" IncludedInCompilation="0" Options="0" CompilationType="1" />
-            <Procedure MapAddress="portable_executable::GetRelocs(void *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="portable_executable::GetImports(void *)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="check_serivice(void)" Options="0" CompilationType="1" />
-            <Procedure MapAddress="main" Options="0" CompilationType="2" />
-            <Procedure MapAddress="InjectDll(class std::basic_string&lt;wchar_t,struct std::char_traits&lt;wchar_t&gt;,class std::allocator&lt;wchar_t&gt; &gt; *)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="GetProcessByNameW(class std::basic_string&lt;wchar_t,struct std::char_traits&lt;wchar_t&gt;,class std::allocator&lt;wchar_t&gt; &gt;)" Options="0" CompilationType="2" />
             <Procedure MapAddress="load_driver(void)" Options="0" CompilationType="2" />
-            <Procedure MapAddress="intel_driver::FreePool(void *,unsigned __int64)" Options="0" CompilationType="1" />
+            <Procedure MapAddress="GetProcessByNameW(class std::basic_string&lt;wchar_t,struct std::char_traits&lt;wchar_t&gt;,class std::allocator&lt;wchar_t&gt; &gt;)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="InjectDll(class std::basic_string&lt;wchar_t,struct std::char_traits&lt;wchar_t&gt;,class std::allocator&lt;wchar_t&gt; &gt; *)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="load(bool,class std::basic_string&lt;wchar_t,struct std::char_traits&lt;wchar_t&gt;,class std::allocator&lt;wchar_t&gt; &gt; *)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="check_serivice(void)" Options="0" CompilationType="2" />
+            <Procedure MapAddress="get_hook_fn(void))(unsigned int,unsigned short,unsigned int)" Options="0" CompilationType="1" />
         </Procedures>
         <Objects />
     </Protection>

@@ -1,5 +1,5 @@
 #pragma once
-#include "provider.hpp"
+#include "memory.hpp"
 #include "lazy_importer.hpp"
 
 #undef RGB
@@ -8,7 +8,7 @@ struct hoster
 {
 	using logger_t = void __fastcall(const char*);
 
-	explicit hoster(provider& _mem, logger_t *_logger): mem(_mem), logger(_logger) {}
+	explicit hoster(memory& _mem, logger_t *_logger): mem(_mem), logger(_logger) {}
 
 	template <typename ...A>
 	void logH(const char* fmt, A... args) const
@@ -22,6 +22,6 @@ struct hoster
 		logger(cad);
 	}
 
-	provider& mem;
+	memory& mem;
 	logger_t* logger;
 };

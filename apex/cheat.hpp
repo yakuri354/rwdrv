@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
 #include "../loader/xorstr.hpp"
-#include "../host/provider.hpp"
+#include "../host/memory.hpp"
 #include "../host/hoster.hpp"
 #include "../host/util.hpp"
 

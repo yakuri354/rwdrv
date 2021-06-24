@@ -36,7 +36,7 @@
     <ClInclude Include="hoster.hpp">
       <Filter>Header files</Filter>
     </ClInclude>
-    <ClInclude Include="provider.hpp">
+    <ClInclude Include="memory.hpp">
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="test.h">
@@ -53,7 +53,7 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source files</Filter>
     </ClCompile>
-    <ClCompile Include="provider.cpp">
+    <ClCompile Include="memory.cpp">
       <Filter>Source files</Filter>
     </ClCompile>
     <ClCompile Include="test.cpp">
