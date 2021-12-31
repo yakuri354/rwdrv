@@ -7,11 +7,11 @@
 typedef uint64_t (drv_ctl_t)(uint32_t a1, uint32_t a2);
 typedef MEMORY_BASIC_INFORMATION mem_info;
 
-struct driver;
+struct rwdrv;
 
 struct driver_handle
 {
-	friend driver;
+	friend rwdrv;
 
 	driver_handle(drv_ctl_t* p_ctl) : ctl(p_ctl)
 	{
@@ -86,9 +86,9 @@ namespace ex
 	};
 }
 
-struct driver : memory
+struct rwdrv : memory
 {
-	driver(const driver_handle& driver);
+	rwdrv(const driver_handle& driver);
 
 	uintptr_t base() override;
 	void attach(uint32_t pid) override;
@@ -105,6 +105,21 @@ private:
 
 	const driver_handle& drv;
 	Control ctl;
+};
+
+struct winapi : memory
+{
+	[[deprecated("Winapi selected")]] // A compile time warning
+	winapi() = default;
+	
+	uintptr_t base() override;
+	void attach(uint32_t pid) override;
+	void read_raw(const void* addr, void* buf, size_t size) override;
+	void write_raw(void* addr, const void* buf, size_t size) override;
+
+private:
+	HANDLE h_proc = nullptr;
+	uint32_t pid = 0;
 };
 
 template <typename T>

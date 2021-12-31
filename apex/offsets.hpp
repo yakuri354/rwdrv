@@ -10,7 +10,7 @@ namespace apex
 		constexpr uintptr_t entity_list = 0x18eda78; // cl_entitylist
 		constexpr uintptr_t local_player = 0x1c9d198; // LocalPlayer
 
-		constexpr uintptr_t item_glow_val = 1363184265;
+		constexpr uint32_t item_glow_val = 1363184265;
 
 		namespace entity
 		{

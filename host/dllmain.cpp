@@ -10,6 +10,7 @@
 #else
 #include "../apex/cheat.hpp"
 #endif
+#include "../rwdrv/config.hpp"
 
 
 struct host_state
@@ -105,8 +106,12 @@ DWORD WINAPI StartHost(void* param)
 
 	try
 	{
-		driver mem{driver_handle{&driver_ctl}};
-
+#if MEMORY_ENGINE == rwdrv
+		rwdrv mem{driver_handle{&driver_ctl}};
+#elif MEMORY_ENGINE == winapi
+		log("warning: using winapi")
+		winapi mem{};
+#endif
 		const hoster host{
 			mem, [](const char* str)
 			{

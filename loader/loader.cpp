@@ -10,6 +10,7 @@
 #include "ShlObj.h"
 #include "../rwdrv/comms.hpp"
 #include "../host/lazy_importer.hpp"
+#include "../rwdrv/config.hpp"
 
 DWORD GetProcessByNameW(std::wstring name)
 {
@@ -404,7 +405,7 @@ bool check_driver()
 	return sysCall(lint.HighPart, CTL_MAGIC, lint.LowPart) == CTLSTATUSBASE;
 }
 
-int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
+int load_rwdrv(bool forceReloadDrv = false, std::wstring* process = nullptr)
 {
 	std::cout << xs("[>] Loading rwdrv") << std::endl;
 
@@ -424,6 +425,8 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 
 	std::cout << xs("[+] AC service not found") << std::endl;
 
+#if MEMORY_ENGINE == rwdrv	
+
 	if (!forceReloadDrv && check_driver())
 	{
 		std::cout << xs("[+] Driver already loaded, injecting dll") << std::endl;
@@ -433,6 +436,10 @@ int load(bool forceReloadDrv = false, std::wstring* process = nullptr)
 		std::cout << xs("[-] Failed to load driver") << std::endl;
 		return 1;
 	}
+	
+#elif MEMORY_ENGINE == winapi
+	std::cout << xs("[!] Using winapi")
+#endif
 
 	if (!InjectDll(process))
 	{
@@ -466,7 +473,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	const auto result = load(force_reload, p_proc);
+	const auto result = load_rwdrv(force_reload, p_proc);
 
 	if (GetConsoleProcessList(nullptr, 0) == 1)
 	{

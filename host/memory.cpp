@@ -1,13 +1,14 @@
 #include "pch.h"
 #include "common.hpp"
 #include "memory.hpp"
+#include "util.hpp"
 
-driver::driver(const driver_handle& driver): drv(driver), ctl()
+rwdrv::rwdrv(const driver_handle& driver): drv(driver), ctl()
 {
 	log("Initializing memory");
 }
 
-uintptr_t driver::base()
+uintptr_t rwdrv::base()
 {
 	ctl.CtlCode = Ctl::GET_BASE_ADDR;
 	if (!CTL_SUCCESS(
@@ -20,7 +21,7 @@ uintptr_t driver::base()
 	return ctl.Result;
 }
 
-void driver::attach(uint32_t pid)
+void rwdrv::attach(uint32_t pid)
 {
 	if (pid == 0)
 	{
@@ -31,7 +32,7 @@ void driver::attach(uint32_t pid)
 	// TODO Test for validity
 }
 
-void driver::read_raw(const void* addr, void* buf, const size_t size)
+void rwdrv::read_raw(const void* addr, void* buf, const size_t size)
 {
 	ctl.CtlCode = Ctl::VIRT_READ;
 	ctl.Source = const_cast<void*>(addr);
@@ -54,7 +55,7 @@ void driver::read_raw(const void* addr, void* buf, const size_t size)
 	}
 }
 
-void driver::write_raw(void* addr, const void* buf, const size_t size)
+void rwdrv::write_raw(void* addr, const void* buf, const size_t size)
 {
 	ctl.CtlCode = Ctl::VIRT_WRITE;
 	ctl.Source = const_cast<void*>(buf);
@@ -74,5 +75,34 @@ void driver::write_raw(void* addr, const void* buf, const size_t size)
 		default:
 			throw ex::driver_error(NTSTATUS(status));
 		}
+	}
+}
+
+uintptr_t winapi::base()
+{
+	return util::base_addr(this->pid);
+}
+
+void winapi::attach(uint32_t pid)
+{
+	this->pid = pid;
+	this->h_proc = OpenProcess(PROCESS_ALL_ACCESS, false, pid);
+}
+
+void winapi::read_raw(const void* addr, void* buf, size_t size)
+{
+	SIZE_T bytes_read;
+	if (!ReadProcessMemory(h_proc, addr, buf, size, &bytes_read))
+	{
+		throw ex::invalid_memory_access{ addr };
+	}
+}
+
+void winapi::write_raw(void* addr, const void* buf, size_t size)
+{
+	SIZE_T bytes_read;
+	if (!WriteProcessMemory(h_proc, addr, buf, size, &bytes_read))
+	{
+		throw ex::invalid_memory_access{ addr };
 	}
 }
