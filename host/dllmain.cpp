@@ -5,6 +5,7 @@
 #include "common.hpp"
 #include "hoster.hpp"
 #include "memory.hpp"
+#define TEST_RUN
 #ifdef TEST_RUN
 #include "test.h"
 #else

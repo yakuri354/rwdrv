@@ -127,8 +127,6 @@ UINT64 Search::FindPattern(UINT64 dwAddress, UINT64 dwLen, BYTE* bMask, char* sz
 
 UINT64 Search::FindPatternInSection(PVOID base, PCCHAR section, PUCHAR bMask, PCHAR szMask)
 {
-	ASSERT(ppFound != NULL);
-
 	if (!base) return NULL;
 
 	const auto pHdr = PIMAGE_NT_HEADERS(UINT_PTR(base) + PIMAGE_DOS_HEADER(base)->e_lfanew);

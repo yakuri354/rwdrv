@@ -372,8 +372,9 @@
     <Link>
       <EntryPointSymbol>DriverEntry</EntryPointSymbol>
       <AdditionalDependencies>Ntoskrnl.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
-      <AdditionalOptions>/pdbaltpath:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <AdditionalOptions>/pdbaltpath:_ %(AdditionalOptions)</AdditionalOptions>
+      <ProgramDatabaseFile />
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp14</LanguageStandard>
@@ -382,6 +383,7 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ControlFlowGuard>false</ControlFlowGuard>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DbgRelease|x64'">

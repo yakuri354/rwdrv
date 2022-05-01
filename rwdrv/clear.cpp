@@ -245,12 +245,13 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 
 	for (size_t i = 0; i < bigPoolTableSize; i++)
 	{
-		if (poolBigPageTable[i].Va == ULONGLONG(pageAddr) || poolBigPageTable[i].Va == ULONGLONG(pageAddr) + 0x1)
+		auto va = poolBigPageTable[i].Va;
+		if (va == ULONGLONG(pageAddr) || va == ULONGLONG(pageAddr) + 0x1)
 		{
 			char tag[5] = {0};
 			RtlCopyMemory(tag, &poolBigPageTable[i].Key, 4);
 			log("Found an entry in BigPoolTable: [0x%p] | Size: 0x%llX | Tag: '%s'",
-			    PVOID(poolBigPageTable[i].Va),
+			    PVOID(va),
 			    poolBigPageTable[i].NumberOfBytes, tag);
 			poolBigPageTable[i].Va = 0x1;
 			poolBigPageTable[i].NumberOfBytes = 0x0;
@@ -260,8 +261,8 @@ NTSTATUS Clear::ClearSystemBigPoolInfo(PVOID pageAddr)
 	}
 	if (!cleared)
 	{
-		log("Entry in BigPoolTable not found!");
-		return STATUS_NOT_FOUND;
+		log("WARN: Entry in BigPoolTable not found!");
+		//return STATUS_NOT_FOUND;
 	}
 	return STATUS_SUCCESS;
 }

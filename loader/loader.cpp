@@ -12,6 +12,35 @@
 #include "../host/lazy_importer.hpp"
 #include "../rwdrv/config.hpp"
 
+HANDLE iqvw64e_device_handle;
+
+LONG WINAPI SimplestCrashHandler(EXCEPTION_POINTERS* ExceptionInfo)
+{
+	if (ExceptionInfo && ExceptionInfo->ExceptionRecord)
+		Log(L"[!!] Crash at addr 0x" << ExceptionInfo->ExceptionRecord->ExceptionAddress << L" by 0x" << std::hex << ExceptionInfo->ExceptionRecord->ExceptionCode << std::endl);
+	else
+		Log(L"[!!] Crash" << std::endl);
+
+	if (iqvw64e_device_handle)
+		intel_driver::Unload(iqvw64e_device_handle);
+
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
+int paramExists(const int argc, wchar_t** argv, const wchar_t* param) {
+	size_t plen = wcslen(param);
+	for (int i = 1; i < argc; i++) {
+		if (wcslen(argv[i]) == plen + 1ull && _wcsicmp(&argv[i][1], param) == 0 && argv[i][0] == '/') { // with slash
+			return i;
+		}
+		else if (wcslen(argv[i]) == plen + 2ull && _wcsicmp(&argv[i][2], param) == 0 && argv[i][0] == '-' && argv[i][1] == '-') { // with double dash
+			return i;
+		}
+	}
+	return -1;
+}
+
+
 DWORD GetProcessByNameW(std::wstring name)
 {
 	DWORD pid = 0;
@@ -62,12 +91,12 @@ std::string GenRandStr(std::default_random_engine& engine, int low, int high)
 	return tmp_s;
 }
 
-std::string ExePath()
+std::wstring ExePath()
 {
-	CHAR buffer[MAX_PATH] = {0};
-	GetModuleFileNameA(NULL, buffer, MAX_PATH);
-	std::string::size_type pos = std::string(buffer).find_last_of(xs("\\/"));
-	return std::string(buffer).substr(0, pos);
+	WCHAR buffer[MAX_PATH] = {0};
+	GetModuleFileNameW(NULL, buffer, MAX_PATH);
+	std::string::size_type pos = std::wstring(buffer).find_last_of(xs(L"\\/"));
+	return std::wstring(buffer).substr(0, pos);
 }
 
 std::wstring ExePathW()
@@ -260,38 +289,96 @@ bool InjectDll(std::wstring* process)
 
 bool load_driver()
 {
-	std::cout << xs("[>] Loading driver") << std::endl;
 
-	auto* const iqvw64e_device_handle = intel_driver::Load();
+	bool free = false;
+	bool mdlMode = false;
+	bool passAllocationPtr = false;
 
-	if (!iqvw64e_device_handle || iqvw64e_device_handle == INVALID_HANDLE_VALUE)
-	{
-		std::cout << xs("[-] Failed to load driver iqvw64e.sys") << std::endl;
+	if (free) {
+		Log(L"[+] Free pool memory after usage enabled" << std::endl);
+	}
+
+	if (mdlMode) {
+		Log(L"[+] Mdl memory usage enabled" << std::endl);
+	}
+
+	if (passAllocationPtr) {
+		Log(L"[+] Pass Allocation Ptr as first param enabled" << std::endl);
+	}
+
+	const std::wstring driver_path = ExePath() + xs(L"\\rwdrv.sys");
+
+	if (!std::filesystem::exists(driver_path)) {
+		Log(L"[-] File " << driver_path << L" doesn't exist" << std::endl);
+		return false;
+	}
+
+	iqvw64e_device_handle = intel_driver::Load();
+
+	if (iqvw64e_device_handle == INVALID_HANDLE_VALUE)
+		return false;
+
+	std::vector<uint8_t> raw_image = { 0 };
+	if (!utils::ReadFileToMemory(driver_path, &raw_image)) {
+		Log(L"[-] Failed to read image to memory" << std::endl);
 		intel_driver::Unload(iqvw64e_device_handle);
 		return false;
 	}
 
-	if (!intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle)
-		|| !intel_driver::ClearMmUnloadedDrivers(iqvw64e_device_handle)
-		|| !intel_driver::ClearKernelHashBucketList(iqvw64e_device_handle))
-	{
-		std::cout << xs("[-] Cleaning up failed") << std::endl;
+	NTSTATUS exitCode = 0;
+	if (!kdmapper::MapDriver(iqvw64e_device_handle, raw_image.data(), 0, 0, free, true, mdlMode, passAllocationPtr, nullptr, &exitCode)) {
+		Log(L"[-] Failed to map " << driver_path << std::endl);
 		intel_driver::Unload(iqvw64e_device_handle);
 		return false;
 	}
 
-	if (!kdmapper::MapDriver(iqvw64e_device_handle, ExePath() + xs("\\rwdrv.sys")))
-	{
-		std::cout << xs("[-] Failed to map rwdrv") << std::endl;
-		intel_driver::Unload(iqvw64e_device_handle);
-		return false;
+	if (!intel_driver::Unload(iqvw64e_device_handle)) {
+		Log(L"[-] Warning failed to fully unload vulnerable driver " << std::endl);
 	}
-
-
-	intel_driver::Unload(iqvw64e_device_handle);
-	std::cout << xs("[>] Successfully loaded driver") << std::endl;
-	return true;
+	Log(L"[+] success" << std::endl);
 }
+
+// bool load_driver()
+// {
+// 	std::cout << xs("[>] Loading driver") << std::endl;
+//
+// 	auto* const iqvw64e_device_handle = intel_driver::Load();
+//
+// 	if (!iqvw64e_device_handle || iqvw64e_device_handle == INVALID_HANDLE_VALUE)
+// 	{
+// 		std::cout << xs("[-] Failed to load driver iqvw64e.sys") << std::endl;
+// 		intel_driver::Unload(iqvw64e_device_handle);
+// 		return false;
+// 	}
+//
+// 	if (!intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle)
+// 		|| !intel_driver::ClearMmUnloadedDrivers(iqvw64e_device_handle)
+// 		|| !intel_driver::ClearKernelHashBucketList(iqvw64e_device_handle))
+// 	{
+// 		std::cout << xs("[-] Cleaning up failed") << std::endl;
+// 		intel_driver::Unload(iqvw64e_device_handle);
+// 		return false;
+// 	}
+//
+// 	std::vector<uint8_t> raw_image = { 0 };
+// 	if (!utils::ReadFileToMemory(driver_path, &raw_image)) {
+// 		Log(L"[-] Failed to read image to memory" << std::endl);
+// 		intel_driver::Unload(iqvw64e_device_handle);
+// 		return -1;
+// 	}
+//
+// 	if (!kdmapper::MapDriver(iqvw64e_device_handle, ExePath() + xs("\\rwdrv.sys"),))
+// 	{
+// 		std::cout << xs("[-] Failed to map rwdrv") << std::endl;
+// 		intel_driver::Unload(iqvw64e_device_handle);
+// 		return false;
+// 	}
+//
+//
+// 	intel_driver::Unload(iqvw64e_device_handle);
+// 	std::cout << xs("[>] Successfully loaded driver") << std::endl;
+// 	return true;
+// }
 
 bool check_serivice()
 {

@@ -35,30 +35,31 @@ namespace nt
 		SYSTEM_HANDLE Handles[1];
 	} SYSTEM_HANDLE_INFORMATION_EX, *PSYSTEM_HANDLE_INFORMATION_EX;
 
+	//Thanks to Pvt Comfy for remember to update this https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_pool_type
 	typedef enum class _POOL_TYPE {
 		NonPagedPool,
-		NonPagedPoolExecute,
+		NonPagedPoolExecute = NonPagedPool,
 		PagedPool,
-		NonPagedPoolMustSucceed,
+		NonPagedPoolMustSucceed = NonPagedPool + 2,
 		DontUseThisType,
-		NonPagedPoolCacheAligned,
+		NonPagedPoolCacheAligned = NonPagedPool + 4,
 		PagedPoolCacheAligned,
-		NonPagedPoolCacheAlignedMustS,
+		NonPagedPoolCacheAlignedMustS = NonPagedPool + 6,
 		MaxPoolType,
-		NonPagedPoolBase,
-		NonPagedPoolBaseMustSucceed,
-		NonPagedPoolBaseCacheAligned,
-		NonPagedPoolBaseCacheAlignedMustS,
-		NonPagedPoolSession,
-		PagedPoolSession,
-		NonPagedPoolMustSucceedSession,
-		DontUseThisTypeSession,
-		NonPagedPoolCacheAlignedSession,
-		PagedPoolCacheAlignedSession,
-		NonPagedPoolCacheAlignedMustSSession,
-		NonPagedPoolNx,
-		NonPagedPoolNxCacheAligned,
-		NonPagedPoolSessionNx
+		NonPagedPoolBase = 0,
+		NonPagedPoolBaseMustSucceed = NonPagedPoolBase + 2,
+		NonPagedPoolBaseCacheAligned = NonPagedPoolBase + 4,
+		NonPagedPoolBaseCacheAlignedMustS = NonPagedPoolBase + 6,
+		NonPagedPoolSession = 32,
+		PagedPoolSession = NonPagedPoolSession + 1,
+		NonPagedPoolMustSucceedSession = PagedPoolSession + 1,
+		DontUseThisTypeSession = NonPagedPoolMustSucceedSession + 1,
+		NonPagedPoolCacheAlignedSession = DontUseThisTypeSession + 1,
+		PagedPoolCacheAlignedSession = NonPagedPoolCacheAlignedSession + 1,
+		NonPagedPoolCacheAlignedMustSSession = PagedPoolCacheAlignedSession + 1,
+		NonPagedPoolNx = 512,
+		NonPagedPoolNxCacheAligned = NonPagedPoolNx + 4,
+		NonPagedPoolSessionNx = NonPagedPoolNx + 32,
 	} POOL_TYPE;
 
 	typedef struct _RTL_PROCESS_MODULE_INFORMATION
@@ -80,4 +81,35 @@ namespace nt
 		ULONG NumberOfModules;
 		RTL_PROCESS_MODULE_INFORMATION Modules[1];
 	} RTL_PROCESS_MODULES, *PRTL_PROCESS_MODULES;
+
+	/*added by psec*/
+	typedef enum _MEMORY_CACHING_TYPE_ORIG {
+		MmFrameBufferCached = 2
+	} MEMORY_CACHING_TYPE_ORIG;
+
+	typedef enum _MEMORY_CACHING_TYPE {
+		MmNonCached = FALSE,
+		MmCached = TRUE,
+		MmWriteCombined = MmFrameBufferCached,
+		MmHardwareCoherentCached,
+		MmNonCachedUnordered,       // IA64
+		MmUSWCCached,
+		MmMaximumCacheType,
+		MmNotMapped = -1
+	} MEMORY_CACHING_TYPE;
+
+	typedef CCHAR KPROCESSOR_MODE;
+
+	typedef enum _MODE {
+		KernelMode,
+		UserMode,
+		MaximumMode
+	} MODE;
+
+	typedef enum _MM_PAGE_PRIORITY {
+		LowPagePriority,
+		NormalPagePriority = 16,
+		HighPagePriority = 32
+	} MM_PAGE_PRIORITY;
+	/**/
 }

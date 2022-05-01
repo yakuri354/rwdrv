@@ -76,9 +76,6 @@ F_INLINE NTSTATUS SetupHook()
 	if (UINT64(Search::RVA(rtLogFn, 1)) == *PUINT64(syscallDataPtr))
 	{
 		log("Syscall is already hooked"); // TODO Proper handling of such situation
-// #ifndef DEBUG
-// 		return STATUS_UNSUCCESSFUL;
-// #endif
 		log("Pointing original syscall to other driver's dispatch. This will BSOD if the other driver is faulty.");
 		g::DriverState.Syscall.OrigPtr = *static_cast<PVOID volatile*>(rtDataPtr);
 	}
